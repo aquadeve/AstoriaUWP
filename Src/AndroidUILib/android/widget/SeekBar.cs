@@ -25,6 +25,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Slider inherits RangeBase → Control (not ContentControl), so use WinUI.Content.
             slider.Minimum = 0;
             slider.Maximum = 100;
             slider.ValueChanged += (s, e) =>

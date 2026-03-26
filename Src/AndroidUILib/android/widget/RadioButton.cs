@@ -12,9 +12,10 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Windows.UI.Xaml.Controls.RadioButton inherits ContentControl, assign directly.
             radioButton.Checked += (s, e) => { mChecked = true; };
             radioButton.Unchecked += (s, e) => { mChecked = false; };
-            WinUI.Content = radioButton;
+            WinUI = radioButton;
 
             if (obj != null && obj.Length > 1 && obj[1] is AttributeSet a)
             {

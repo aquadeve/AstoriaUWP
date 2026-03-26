@@ -26,6 +26,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // ComboBox inherits ItemsControl → Control (not ContentControl), so use WinUI.Content.
             comboBox.HorizontalAlignment = HorizontalAlignment.Stretch;
             comboBox.SelectionChanged += (s, e) =>
             {

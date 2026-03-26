@@ -51,6 +51,7 @@ namespace AndroidInteropLib.android.support.design.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Pivot inherits ItemsControl → Control (not ContentControl), so use WinUI.Content.
             WinUI.Content = pivot;
         }
 

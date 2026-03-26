@@ -412,7 +412,10 @@ namespace DalvikUWPCSharp.Reassembly.UI
             }
 
             // ── FrameLayout (also catches android.widget.FrameLayout, etc.) ───────
-            else if (xeName.Contains("FrameLayout"))
+            else if (xeName == "FrameLayout"
+                  || xeName == "android.widget.FrameLayout"
+                  || xeName == "androidx.legacy.app.AppCompatFrameLayout"
+                  || xeName.StartsWith("android.widget.FrameLayout"))
             {
                 Grid container = new Grid();
                 ApplyCommonAttributes(container, xe);
@@ -557,7 +560,7 @@ namespace DalvikUWPCSharp.Reassembly.UI
                     try { tb.Foreground = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "textColor").Value)); } catch { }
                 if (xe.Attribute(p1nspace + "maxLines") != null
                     && int.TryParse(xe.Attribute(p1nspace + "maxLines").Value, out var etmaxl))
-                    tb.MaxLength = etmaxl * 200;
+                    tb.MaxLength = etmaxl * 200; // ~200 chars per line as rough approximation
                 ApplyCommonAttributes(tb, xe);
                 return tb;
             }

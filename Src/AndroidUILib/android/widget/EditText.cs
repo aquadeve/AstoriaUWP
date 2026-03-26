@@ -13,6 +13,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // TextBox inherits Control (not ContentControl), so use WinUI.Content.
             WinUI.Content = textBox;
             if (obj != null && obj.Length > 1 && obj[1] is AttributeSet a)
             {

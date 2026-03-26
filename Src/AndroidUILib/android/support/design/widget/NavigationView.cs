@@ -23,6 +23,7 @@ namespace AndroidInteropLib.android.support.design.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // NavigationView inherits Control (not ContentControl), so use WinUI.Content.
             WinUI.Content = navigationView;
         }
 

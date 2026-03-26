@@ -20,6 +20,7 @@ namespace AndroidInteropLib.android.support.v7.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Border inherits FrameworkElement (not ContentControl), so use WinUI.Content.
             card.CornerRadius = new Windows.UI.Xaml.CornerRadius(4);
             card.Background = new SolidColorBrush(Windows.UI.Colors.White);
             card.Margin = new Thickness(8);

@@ -25,6 +25,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // StackPanel inherits Panel (not ContentControl), so use WinUI.Content.
             UpdateStars();
             WinUI.Content = panel;
         }

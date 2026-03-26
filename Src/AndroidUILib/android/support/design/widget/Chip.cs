@@ -18,11 +18,12 @@ namespace AndroidInteropLib.android.support.design.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Windows.UI.Xaml.Controls.Button inherits ContentControl, assign directly.
             button.CornerRadius = new Windows.UI.Xaml.CornerRadius(16);
             button.Margin = new Thickness(4, 2, 4, 2);
             button.Padding = new Thickness(12, 4, 12, 4);
             button.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 224, 224, 224));
-            WinUI.Content = button;
+            WinUI = button;
         }
 
         public void setText(string text) { button.Content = text; }

@@ -15,11 +15,12 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Windows.UI.Xaml.Controls.Button inherits ContentControl, assign directly.
             image.Width = 24;
             image.Height = 24;
             button.Content = image;
             button.Padding = new Windows.UI.Xaml.Thickness(8);
-            WinUI.Content = button;
+            WinUI = button;
         }
 
         public void setOnClickListener(System.Action onClick)

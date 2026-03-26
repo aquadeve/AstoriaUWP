@@ -24,6 +24,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Image inherits FrameworkElement (not ContentControl), so use WinUI.Content.
             image.Stretch = Stretch.Uniform;
             WinUI.Content = image;
         }

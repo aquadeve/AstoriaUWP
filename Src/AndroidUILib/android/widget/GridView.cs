@@ -27,6 +27,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // GridView inherits ItemsControl → Control (not ContentControl), so use WinUI.Content.
             gridView.HorizontalAlignment = HorizontalAlignment.Stretch;
             gridView.VerticalAlignment = VerticalAlignment.Stretch;
             gridView.ItemClick += (s, e) =>

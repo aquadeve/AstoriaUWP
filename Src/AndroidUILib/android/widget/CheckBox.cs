@@ -12,9 +12,10 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Windows.UI.Xaml.Controls.CheckBox inherits ContentControl, assign directly.
             checkBox.Checked += (s, e) => { mChecked = true; };
             checkBox.Unchecked += (s, e) => { mChecked = false; };
-            WinUI.Content = checkBox;
+            WinUI = checkBox;
 
             if (obj != null && obj.Length > 1 && obj[1] is AttributeSet a)
             {

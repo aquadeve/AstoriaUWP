@@ -18,6 +18,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Grid inherits Panel (not ContentControl), so use WinUI.Content.
             grid.HorizontalAlignment = HorizontalAlignment.Stretch;
             grid.VerticalAlignment = VerticalAlignment.Stretch;
             WinUI.Content = grid;

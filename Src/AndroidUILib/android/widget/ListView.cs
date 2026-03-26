@@ -14,6 +14,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // ListView inherits ItemsControl → Control (not ContentControl), so use WinUI.Content.
             listView.HorizontalAlignment = HorizontalAlignment.Stretch;
             listView.VerticalAlignment = VerticalAlignment.Stretch;
             WinUI.Content = listView;

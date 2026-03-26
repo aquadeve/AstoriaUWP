@@ -18,6 +18,7 @@ namespace AndroidInteropLib.android.support.design.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // StackPanel inherits Panel (not ContentControl), so use WinUI.Content.
             stackPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
             WinUI.Content = stackPanel;
         }

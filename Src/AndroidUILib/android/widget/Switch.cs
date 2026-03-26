@@ -16,6 +16,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // ToggleSwitch inherits Control, not ContentControl, so use WinUI.Content.
             toggleSwitch.IsOn = mChecked;
             toggleSwitch.Toggled += (s, e) => { mChecked = toggleSwitch.IsOn; };
             WinUI.Content = toggleSwitch;

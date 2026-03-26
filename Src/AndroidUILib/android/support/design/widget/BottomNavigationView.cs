@@ -29,9 +29,10 @@ namespace AndroidInteropLib.android.support.design.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // CommandBar inherits AppBar → ContentControl; assign directly.
             commandBar.VerticalAlignment = VerticalAlignment.Bottom;
             commandBar.HorizontalAlignment = HorizontalAlignment.Stretch;
-            WinUI.Content = commandBar;
+            WinUI = commandBar;
         }
 
         public void setOnNavigationItemSelectedListener(OnNavigationItemSelectedListener listener) { }

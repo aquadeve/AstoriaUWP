@@ -18,6 +18,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // Windows.UI.Xaml.Controls.Primitives.ToggleButton inherits ContentControl, assign directly.
             winToggle.Content = mChecked ? textOn : textOff;
             winToggle.Checked += (s, e) =>
             {
@@ -29,7 +30,7 @@ namespace AndroidInteropLib.android.widget
                 mChecked = false;
                 winToggle.Content = textOff;
             };
-            WinUI.Content = winToggle;
+            WinUI = winToggle;
         }
 
         public override void setText(string text) { winToggle.Content = text; }

@@ -20,6 +20,7 @@ namespace AndroidInteropLib.android.widget
 
         public override void CreateWinUI(params object[] obj)
         {
+            // ProgressBar and ProgressRing inherit Control (not ContentControl), so use WinUI.Content.
             if (isIndeterminate)
             {
                 progressRing.IsActive = true;
