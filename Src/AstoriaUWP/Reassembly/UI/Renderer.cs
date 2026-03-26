@@ -18,6 +18,7 @@ using Windows.Storage;
 using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Media;
 
 
@@ -146,56 +147,177 @@ namespace DalvikUWPCSharp.Reassembly.UI
         }//RenderXMLFile
 
 
+        /// <summary>
+        /// Applies common Android layout/view attributes to a UWP FrameworkElement.
+        /// Handles: layout_width, layout_height, background, visibility, padding,
+        /// layout_margin and their directional variants.
+        /// </summary>
+        private void ApplyCommonAttributes(FrameworkElement element, XElement xe)
+        {
+            // layout_width
+            if (xe.Attribute(p1nspace + "layout_width") != null)
+            {
+                string val = xe.Attribute(p1nspace + "layout_width").Value;
+                if (val == "match_parent" || val == "fill_parent")
+                    element.HorizontalAlignment = HorizontalAlignment.Stretch;
+                else if (val == "wrap_content")
+                    element.Width = double.NaN;
+                else if (double.TryParse(val, out var w))
+                    element.Width = w;
+            }
+
+            // layout_height
+            if (xe.Attribute(p1nspace + "layout_height") != null)
+            {
+                string val = xe.Attribute(p1nspace + "layout_height").Value;
+                if (val == "match_parent" || val == "fill_parent")
+                    element.VerticalAlignment = VerticalAlignment.Stretch;
+                else if (val == "wrap_content")
+                    element.Height = double.NaN;
+                else if (double.TryParse(val, out var h))
+                    element.Height = h;
+            }
+
+            // background
+            if (xe.Attribute(p1nspace + "background") != null)
+            {
+                try
+                {
+                    var brush = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value));
+                    if (element is Panel panel) panel.Background = brush;
+                    else if (element is Control ctrl) ctrl.Background = brush;
+                    else if (element is Border border) border.Background = brush;
+                }
+                catch { }
+            }
+
+            // visibility
+            if (xe.Attribute(p1nspace + "visibility") != null)
+            {
+                string vis = xe.Attribute(p1nspace + "visibility").Value.ToLower();
+                element.Visibility = (vis == "gone" || vis == "invisible")
+                    ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            // alpha
+            if (xe.Attribute(p1nspace + "alpha") != null
+                && double.TryParse(xe.Attribute(p1nspace + "alpha").Value, out var alpha))
+                element.Opacity = alpha;
+
+            // minWidth / minHeight
+            if (xe.Attribute(p1nspace + "minWidth") != null
+                && double.TryParse(xe.Attribute(p1nspace + "minWidth").Value, out var minW))
+                element.MinWidth = minW;
+            if (xe.Attribute(p1nspace + "minHeight") != null
+                && double.TryParse(xe.Attribute(p1nspace + "minHeight").Value, out var minH))
+                element.MinHeight = minH;
+
+            // padding (only applies to Control)
+            if (element is Control ctrlPad)
+            {
+                Thickness padding = ctrlPad.Padding;
+                bool hasPadding = false;
+                if (xe.Attribute(p1nspace + "padding") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "padding").Value, out var p))
+                { padding = new Thickness(p); hasPadding = true; }
+                if (xe.Attribute(p1nspace + "paddingLeft") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "paddingLeft").Value, out var pl))
+                { padding.Left = pl; hasPadding = true; }
+                if (xe.Attribute(p1nspace + "paddingRight") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "paddingRight").Value, out var pr))
+                { padding.Right = pr; hasPadding = true; }
+                if (xe.Attribute(p1nspace + "paddingTop") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "paddingTop").Value, out var pt))
+                { padding.Top = pt; hasPadding = true; }
+                if (xe.Attribute(p1nspace + "paddingBottom") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "paddingBottom").Value, out var pb))
+                { padding.Bottom = pb; hasPadding = true; }
+                if (hasPadding) ctrlPad.Padding = padding;
+            }
+
+            // layout_margin
+            {
+                Thickness margin = element.Margin;
+                bool hasMargin = false;
+                if (xe.Attribute(p1nspace + "layout_margin") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "layout_margin").Value, out var m))
+                { margin = new Thickness(m); hasMargin = true; }
+                if (xe.Attribute(p1nspace + "layout_marginLeft") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "layout_marginLeft").Value, out var ml))
+                { margin.Left = ml; hasMargin = true; }
+                if (xe.Attribute(p1nspace + "layout_marginRight") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "layout_marginRight").Value, out var mr))
+                { margin.Right = mr; hasMargin = true; }
+                if (xe.Attribute(p1nspace + "layout_marginTop") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "layout_marginTop").Value, out var mt))
+                { margin.Top = mt; hasMargin = true; }
+                if (xe.Attribute(p1nspace + "layout_marginBottom") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "layout_marginBottom").Value, out var mb))
+                { margin.Bottom = mb; hasMargin = true; }
+                if (hasMargin) element.Margin = margin;
+            }
+
+            // layout_gravity / gravity → HorizontalAlignment / VerticalAlignment
+            string gravityAttr = xe.Attribute(p1nspace + "layout_gravity")?.Value
+                              ?? xe.Attribute(p1nspace + "gravity")?.Value;
+            if (!string.IsNullOrEmpty(gravityAttr))
+            {
+                string g = gravityAttr.ToLower();
+                if (g.Contains("center_horizontal") || g.Contains("center"))
+                    element.HorizontalAlignment = HorizontalAlignment.Center;
+                else if (g.Contains("right") || g.Contains("end"))
+                    element.HorizontalAlignment = HorizontalAlignment.Right;
+                else if (g.Contains("left") || g.Contains("start"))
+                    element.HorizontalAlignment = HorizontalAlignment.Left;
+
+                if (g.Contains("center_vertical") || g.Contains("center"))
+                    element.VerticalAlignment = VerticalAlignment.Center;
+                else if (g.Contains("bottom"))
+                    element.VerticalAlignment = VerticalAlignment.Bottom;
+                else if (g.Contains("top"))
+                    element.VerticalAlignment = VerticalAlignment.Top;
+            }
+        }
+
         // RenderObject
         public async Task<UIElement> RenderObject(XElement xe)
         {
             string xeName = xe.Name.ToString();
-            
+
             bool nestedObjs = xe.HasElements;
 
-            //RnD
-            //AstoriaContext context = new AstoriaContext();
-            //AstoriaContext context = new AstoriaContext(da, res);
-
-            if (xeName.Equals("android.support.design.widget.AppBarLayout"))
+            // ── AppBarLayout ──────────────────────────────────────────────────────
+            if (xeName == "android.support.design.widget.AppBarLayout"
+             || xeName == "com.google.android.material.appbar.AppBarLayout")
             {
                 Grid container = new Grid();
                 container.VerticalAlignment = VerticalAlignment.Top;
                 container.HorizontalAlignment = HorizontalAlignment.Stretch;
-                if (xe.Attribute(p1nspace + "layout_width") != null)
-                    container.Width = double.TryParse(xe.Attribute(p1nspace + "layout_width").Value, out var w) ? w : container.Width;
-                if (xe.Attribute(p1nspace + "layout_height") != null)
-                    container.Height = double.TryParse(xe.Attribute(p1nspace + "layout_height").Value, out var h) ? h : container.Height;
-                if (xe.Attribute(p1nspace + "background") != null)
-                    container.Background = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value));
+                ApplyCommonAttributes(container, xe);
                 if (nestedObjs)
-                {
                     foreach (XElement xe1 in xe.Elements())
                     {
-                        container.Children.Add(await RenderObject(xe1));
+                        var child = await RenderObject(xe1);
+                        if (child != null) container.Children.Add(child);
                     }
-                }
                 return container;
             }
-            else if (xeName.Equals("android.support.design.widget.CoordinatorLayout"))
+
+            // ── CoordinatorLayout ────────────────────────────────────────────────
+            else if (xeName == "android.support.design.widget.CoordinatorLayout"
+                  || xeName == "androidx.coordinatorlayout.widget.CoordinatorLayout")
             {
                 CoordinatorLayout cl = new CoordinatorLayout();
-                if (xe.Attribute(p1nspace + "layout_width") != null)
-                    cl.Width = double.TryParse(xe.Attribute(p1nspace + "layout_width").Value, out var w) ? w : cl.Width;
-                if (xe.Attribute(p1nspace + "layout_height") != null)
-                    cl.Height = double.TryParse(xe.Attribute(p1nspace + "layout_height").Value, out var h) ? h : cl.Height;
-                if (xe.Attribute(p1nspace + "background") != null)
-                    cl.Background = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value));
+                ApplyCommonAttributes(cl, xe);
                 if (nestedObjs)
-                {
                     foreach (XElement xe1 in xe.Elements())
-                    {
                         cl.Add(await RenderObject(xe1));
-                    }
-                }
                 return cl;
             }
-            else if (xeName.Equals("android.support.design.widget.FloatingActionButton"))
+
+            // ── FloatingActionButton ──────────────────────────────────────────────
+            else if (xeName == "android.support.design.widget.FloatingActionButton"
+                  || xeName == "com.google.android.material.floatingactionbutton.FloatingActionButton")
             {
                 Button fab = new Button();
                 fab.Width = 56; fab.Height = 56;
@@ -205,10 +327,14 @@ namespace DalvikUWPCSharp.Reassembly.UI
                 fab.Content = "+";
                 fab.Background = new SolidColorBrush(Windows.UI.Colors.DeepSkyBlue);
                 fab.Foreground = new SolidColorBrush(Windows.UI.Colors.White);
-                fab.CornerRadius = new Windows.UI.Xaml.CornerRadius(28);
+                fab.CornerRadius = new CornerRadius(28);
+                ApplyCommonAttributes(fab, xe);
                 return fab;
             }
-            else if (xeName.Equals("android.support.v7.widget.Toolbar"))
+
+            // ── Toolbar ───────────────────────────────────────────────────────────
+            else if (xeName == "android.support.v7.widget.Toolbar"
+                  || xeName == "androidx.appcompat.widget.Toolbar")
             {
                 AndroidToolbar at = new AndroidToolbar();
                 if (xe.Attribute(p1nspace + "title") != null)
@@ -216,184 +342,653 @@ namespace DalvikUWPCSharp.Reassembly.UI
                 else
                     at.SetTitle(CurrentApp.metadata.label);
                 if (xe.Attribute(p1nspace + "background") != null)
-                    at.Background = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value));
+                    try { at.Background = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value)); } catch { }
+                ApplyCommonAttributes(at, xe);
                 return at;
             }
-            else if (xeName.Equals("include"))
+
+            // ── include ───────────────────────────────────────────────────────────
+            else if (xeName == "include")
             {
-                try {
+                try
+                {
                     string relUri = xe.Attribute("layout").Value;
                     string path = CurrentApp.resFolder.Path + relUri.Replace('@', '\\').Replace('/', '\\') + ".xml";
                     StorageFile sf = await StorageFile.GetFileFromPathAsync(path);
                     return await RenderXmlFile(sf);
-                } catch {
+                }
+                catch
+                {
                     Debug.WriteLine("[Renderer] Failed to include layout: " + xe);
                     return null;
                 }
             }
-            else if (xeName.Equals("RelativeLayout"))
+
+            // ── ConstraintLayout ──────────────────────────────────────────────────
+            else if (xeName == "androidx.constraintlayout.widget.ConstraintLayout"
+                  || xeName == "android.support.constraint.ConstraintLayout"
+                  || xeName == "ConstraintLayout"
+                  || xeName == "android.widget.ConstraintLayout")
             {
-                var container = new AndroidInteropLib.android.widget.RelativeLayout(null, null);
-                container.CreateWinUI();
+                Grid container = new Grid();
+                ApplyCommonAttributes(container, xe);
                 if (nestedObjs)
-                {
                     foreach (XElement xe1 in xe.Elements())
                     {
                         var child = await RenderObject(xe1);
-                        if (child is UIElement uiChild)
-                        {
-                            //TODO
-                            //container.addView(uiChild);
-                        }
+                        if (child != null) container.Children.Add(child);
                     }
-                }
-                return container.WinUI;
+                return container;
             }
-            else if (xeName.Equals("LinearLayout"))
+
+            // ── LinearLayout ──────────────────────────────────────────────────────
+            else if (xeName == "LinearLayout" || xeName == "android.widget.LinearLayout")
             {
-                var container = new AndroidInteropLib.android.widget.LinearLayout(null, null);
-                container.CreateWinUI();
+                StackPanel panel = new StackPanel();
+                string orientation = xe.Attribute(p1nspace + "orientation")?.Value?.ToLower() ?? "vertical";
+                panel.Orientation = orientation == "horizontal" ? Orientation.Horizontal : Orientation.Vertical;
+                ApplyCommonAttributes(panel, xe);
                 if (nestedObjs)
-                {
                     foreach (XElement xe1 in xe.Elements())
                     {
                         var child = await RenderObject(xe1);
-                        if (child is UIElement uiChild)
-                        {
-                            //TODO
-                            //container.addView(uiChild);
-                        }
+                        if (child != null) panel.Children.Add(child);
                     }
-                }
-                return container.WinUI;
+                return panel;
             }
-            else if (xeName.Equals("FrameLayout"))
+
+            // ── RelativeLayout ────────────────────────────────────────────────────
+            else if (xeName == "RelativeLayout" || xeName == "android.widget.RelativeLayout")
             {
-                var container = new AndroidInteropLib.android.widget.FrameLayout(null, null);
-                container.CreateWinUI();
+                Grid container = new Grid();
+                ApplyCommonAttributes(container, xe);
                 if (nestedObjs)
-                {
                     foreach (XElement xe1 in xe.Elements())
                     {
                         var child = await RenderObject(xe1);
-                        if (child is UIElement uiChild)
-                        {
-                            //TODO
-                            //container.addView(uiChild);
-                        }
+                        if (child != null) container.Children.Add(child);
                     }
-                }
-                return container.WinUI;
+                return container;
             }
-            else if (xeName.Equals("TextView"))
+
+            // ── FrameLayout (also catches android.widget.FrameLayout, etc.) ───────
+            else if (xeName.Contains("FrameLayout"))
+            {
+                Grid container = new Grid();
+                ApplyCommonAttributes(container, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) container.Children.Add(child);
+                    }
+                return container;
+            }
+
+            // ── GridLayout ────────────────────────────────────────────────────────
+            else if (xeName == "GridLayout"
+                  || xeName == "android.widget.GridLayout"
+                  || xeName == "androidx.gridlayout.widget.GridLayout")
+            {
+                Grid grid = new Grid();
+                ApplyCommonAttributes(grid, xe);
+                if (xe.Attribute(p1nspace + "rowCount") != null
+                    && int.TryParse(xe.Attribute(p1nspace + "rowCount").Value, out var rc))
+                    for (int i = 0; i < rc; i++)
+                        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                if (xe.Attribute(p1nspace + "columnCount") != null
+                    && int.TryParse(xe.Attribute(p1nspace + "columnCount").Value, out var cc))
+                    for (int i = 0; i < cc; i++)
+                        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) grid.Children.Add(child);
+                    }
+                return grid;
+            }
+
+            // ── ScrollView ────────────────────────────────────────────────────────
+            else if (xeName == "ScrollView" || xeName == "android.widget.ScrollView")
+            {
+                ScrollViewer sv = new ScrollViewer();
+                sv.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+                StackPanel content = new StackPanel();
+                sv.Content = content;
+                ApplyCommonAttributes(sv, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) content.Children.Add(child);
+                    }
+                return sv;
+            }
+
+            // ── HorizontalScrollView ──────────────────────────────────────────────
+            else if (xeName == "HorizontalScrollView" || xeName == "android.widget.HorizontalScrollView")
+            {
+                ScrollViewer sv = new ScrollViewer();
+                sv.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+                sv.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
+                StackPanel content = new StackPanel { Orientation = Orientation.Horizontal };
+                sv.Content = content;
+                ApplyCommonAttributes(sv, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) content.Children.Add(child);
+                    }
+                return sv;
+            }
+
+            // ── TextView ──────────────────────────────────────────────────────────
+            else if (xeName == "TextView" || xeName == "android.widget.TextView")
             {
                 TextBlock tv = new TextBlock();
+                tv.Margin = new Thickness(14.8, 7.4, 14.8, 7.4);
                 if (xe.Attribute(p1nspace + "text") != null)
                     tv.Text = xe.Attribute(p1nspace + "text").Value;
-                tv.Margin = new Thickness(14.8, 7.4, 14.8, 7.4);
-                if (xe.Attribute(p1nspace + "layout_width") != null && double.TryParse(xe.Attribute(p1nspace + "layout_width").Value, out var w))
-                    tv.Width = w;
-                if (xe.Attribute(p1nspace + "layout_height") != null && double.TryParse(xe.Attribute(p1nspace + "layout_height").Value, out var h))
-                    tv.Height = h;
+                if (xe.Attribute(p1nspace + "hint") != null && string.IsNullOrEmpty(tv.Text))
+                    tv.Text = xe.Attribute(p1nspace + "hint").Value;
+                if (xe.Attribute(p1nspace + "layout_width") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "layout_width").Value, out var tvw))
+                    tv.Width = tvw;
+                if (xe.Attribute(p1nspace + "layout_height") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "layout_height").Value, out var tvh))
+                    tv.Height = tvh;
                 if (xe.Attribute(p1nspace + "textColor") != null)
-                    tv.Foreground = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "textColor").Value));
-                if (xe.Attribute(p1nspace + "textSize") != null && double.TryParse(xe.Attribute(p1nspace + "textSize").Value, out var sz))
+                    try { tv.Foreground = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "textColor").Value)); } catch { }
+                if (xe.Attribute(p1nspace + "textSize") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "textSize").Value, out var sz))
                     tv.FontSize = sz;
+                if (xe.Attribute(p1nspace + "textStyle") != null)
+                {
+                    string style = xe.Attribute(p1nspace + "textStyle").Value.ToLower();
+                    if (style.Contains("bold")) tv.FontWeight = Windows.UI.Text.FontWeights.Bold;
+                    if (style.Contains("italic")) tv.FontStyle = Windows.UI.Text.FontStyle.Italic;
+                }
                 if (xe.Attribute(p1nspace + "gravity") != null)
                 {
                     string gravity = xe.Attribute(p1nspace + "gravity").Value.ToLower();
                     if (gravity.Contains("center")) tv.TextAlignment = TextAlignment.Center;
-                    else if (gravity.Contains("right")) tv.TextAlignment = TextAlignment.Right;
+                    else if (gravity.Contains("right") || gravity.Contains("end")) tv.TextAlignment = TextAlignment.Right;
                     else tv.TextAlignment = TextAlignment.Left;
+                }
+                if (xe.Attribute(p1nspace + "maxLines") != null
+                    && int.TryParse(xe.Attribute(p1nspace + "maxLines").Value, out var maxl))
+                    tv.MaxLines = maxl;
+                if (xe.Attribute(p1nspace + "visibility") != null)
+                {
+                    string vis = xe.Attribute(p1nspace + "visibility").Value.ToLower();
+                    tv.Visibility = (vis == "gone" || vis == "invisible") ? Visibility.Collapsed : Visibility.Visible;
                 }
                 return tv;
             }
-            else if (  /*xeName.Equals("FrameLayout")*/xeName.Contains("FrameLayout"))
+
+            // ── EditText ──────────────────────────────────────────────────────────
+            else if (xeName == "EditText"
+                  || xeName == "android.widget.EditText"
+                  || xeName == "android.support.design.widget.TextInputEditText"
+                  || xeName == "com.google.android.material.textfield.TextInputEditText")
             {
-               
-                //Return Grid with objects inside
-                Grid container = new Grid();
-                if (nestedObjs)
+                string inputType = xe.Attribute(p1nspace + "inputType")?.Value?.ToLower() ?? "";
+                if (inputType.Contains("textpassword") || inputType.Contains("numberpassword"))
                 {
+                    PasswordBox pb = new PasswordBox();
+                    if (xe.Attribute(p1nspace + "hint") != null)
+                        pb.PlaceholderText = xe.Attribute(p1nspace + "hint").Value;
+                    ApplyCommonAttributes(pb, xe);
+                    return pb;
+                }
+                TextBox tb = new TextBox();
+                if (xe.Attribute(p1nspace + "text") != null)
+                    tb.Text = xe.Attribute(p1nspace + "text").Value;
+                if (xe.Attribute(p1nspace + "hint") != null)
+                    tb.PlaceholderText = xe.Attribute(p1nspace + "hint").Value;
+                if (inputType.Contains("textmultiline") || inputType.Contains("textnosuggestions"))
+                    tb.AcceptsReturn = true;
+                if (xe.Attribute(p1nspace + "textSize") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "textSize").Value, out var etsz))
+                    tb.FontSize = etsz;
+                if (xe.Attribute(p1nspace + "textColor") != null)
+                    try { tb.Foreground = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "textColor").Value)); } catch { }
+                if (xe.Attribute(p1nspace + "maxLines") != null
+                    && int.TryParse(xe.Attribute(p1nspace + "maxLines").Value, out var etmaxl))
+                    tb.MaxLength = etmaxl * 200;
+                ApplyCommonAttributes(tb, xe);
+                return tb;
+            }
+
+            // ── Button / MaterialButton ───────────────────────────────────────────
+            else if (xeName == "Button"
+                  || xeName == "android.widget.Button"
+                  || xeName == "com.google.android.material.button.MaterialButton")
+            {
+                Button btn = new Button();
+                if (xe.Attribute(p1nspace + "text") != null)
+                    btn.Content = xe.Attribute(p1nspace + "text").Value;
+                if (xe.Attribute(p1nspace + "textColor") != null)
+                    try { btn.Foreground = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "textColor").Value)); } catch { }
+                if (xe.Attribute(p1nspace + "background") != null)
+                    try { btn.Background = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value)); } catch { }
+                if (xe.Attribute(p1nspace + "enabled") != null)
+                    btn.IsEnabled = xe.Attribute(p1nspace + "enabled").Value != "false";
+                ApplyCommonAttributes(btn, xe);
+                return btn;
+            }
+
+            // ── ImageButton ───────────────────────────────────────────────────────
+            else if (xeName == "ImageButton" || xeName == "android.widget.ImageButton")
+            {
+                Button btn = new Button();
+                Windows.UI.Xaml.Controls.Image img = new Windows.UI.Xaml.Controls.Image();
+                img.Width = 24; img.Height = 24;
+                img.Source = new Windows.UI.Xaml.Media.Imaging.BitmapImage(
+                    new Uri("ms-appx:///Assets/Square150x150Logo.png"));
+                btn.Content = img;
+                btn.Padding = new Thickness(8);
+                ApplyCommonAttributes(btn, xe);
+                return btn;
+            }
+
+            // ── ImageView ─────────────────────────────────────────────────────────
+            else if (xeName == "ImageView" || xeName == "android.widget.ImageView")
+            {
+                Windows.UI.Xaml.Controls.Image img = new Windows.UI.Xaml.Controls.Image();
+                img.Stretch = Windows.UI.Xaml.Media.Stretch.Uniform;
+                img.Margin = new Thickness(4);
+                if (xe.Attribute(p1nspace + "src") != null)
+                {
+                    try
+                    {
+                        img.Source = new Windows.UI.Xaml.Media.Imaging.BitmapImage(
+                            new Uri("ms-appx:///Assets/Square150x150Logo.png"));
+                    }
+                    catch { }
+                }
+                if (xe.Attribute(p1nspace + "scaleType") != null)
+                {
+                    switch (xe.Attribute(p1nspace + "scaleType").Value.ToLower())
+                    {
+                        case "fitxy": img.Stretch = Windows.UI.Xaml.Media.Stretch.Fill; break;
+                        case "centercrop":
+                        case "fitstart":
+                        case "fitend": img.Stretch = Windows.UI.Xaml.Media.Stretch.UniformToFill; break;
+                        case "centerinside":
+                        case "matrix": img.Stretch = Windows.UI.Xaml.Media.Stretch.None; break;
+                        default: img.Stretch = Windows.UI.Xaml.Media.Stretch.Uniform; break;
+                    }
+                }
+                ApplyCommonAttributes(img, xe);
+                return img;
+            }
+
+            // ── CheckBox ──────────────────────────────────────────────────────────
+            else if (xeName == "CheckBox" || xeName == "android.widget.CheckBox")
+            {
+                CheckBox cb = new CheckBox();
+                if (xe.Attribute(p1nspace + "text") != null)
+                    cb.Content = xe.Attribute(p1nspace + "text").Value;
+                if (xe.Attribute(p1nspace + "checked") != null)
+                    cb.IsChecked = xe.Attribute(p1nspace + "checked").Value == "true";
+                if (xe.Attribute(p1nspace + "enabled") != null)
+                    cb.IsEnabled = xe.Attribute(p1nspace + "enabled").Value != "false";
+                ApplyCommonAttributes(cb, xe);
+                return cb;
+            }
+
+            // ── RadioButton ───────────────────────────────────────────────────────
+            else if (xeName == "RadioButton" || xeName == "android.widget.RadioButton")
+            {
+                RadioButton rb = new RadioButton();
+                if (xe.Attribute(p1nspace + "text") != null)
+                    rb.Content = xe.Attribute(p1nspace + "text").Value;
+                if (xe.Attribute(p1nspace + "checked") != null)
+                    rb.IsChecked = xe.Attribute(p1nspace + "checked").Value == "true";
+                if (xe.Attribute(p1nspace + "enabled") != null)
+                    rb.IsEnabled = xe.Attribute(p1nspace + "enabled").Value != "false";
+                ApplyCommonAttributes(rb, xe);
+                return rb;
+            }
+
+            // ── RadioGroup ────────────────────────────────────────────────────────
+            else if (xeName == "RadioGroup" || xeName == "android.widget.RadioGroup")
+            {
+                StackPanel panel = new StackPanel();
+                string orientation = xe.Attribute(p1nspace + "orientation")?.Value?.ToLower() ?? "vertical";
+                panel.Orientation = orientation == "horizontal" ? Orientation.Horizontal : Orientation.Vertical;
+                ApplyCommonAttributes(panel, xe);
+                if (nestedObjs)
                     foreach (XElement xe1 in xe.Elements())
                     {
-                        container.Children.Add(await RenderObject(xe1));
+                        var child = await RenderObject(xe1);
+                        if (child != null) panel.Children.Add(child);
                     }
-                }
-
-                return container;
+                return panel;
             }
 
-            // *** experimental - begin ***
-            
-            else if (xeName.Equals("android.widget.FrameLayout1"))
+            // ── Switch / SwitchCompat ─────────────────────────────────────────────
+            else if (xeName == "Switch"
+                  || xeName == "android.widget.Switch"
+                  || xeName == "androidx.appcompat.widget.SwitchCompat")
             {
-                Debug.WriteLine($"[Renderer] android.widget.FrameLayout for element: {xe}");
-                ShapeView shapeView = new ShapeView(new AstoriaContext(), new AstoriaAttrSet(xe));
-                try
-                {
-                    string primitive = xe.Attribute("primitive")?.Value?.ToLower() ?? "rectangle";
-                    Windows.UI.Color color = Windows.UI.Colors.White;
-                    if (xe.Attribute("color") != null)
-                    {
-                        color = ColorUtil.FromString(xe.Attribute("color").Value);
-                    }
-                    switch (primitive)
-                    {
-                        case "rectangle":
-                            {
-                                double width = xe.Attribute("width") != null ? double.Parse(xe.Attribute("width").Value) : 100;
-                                double height = xe.Attribute("height") != null ? double.Parse(xe.Attribute("height").Value) : 100;
-                                shapeView.DrawRectangle(width, height, color);
-                                break;
-                            }
-                        case "ellipse":
-                            {
-                                double width = xe.Attribute("width") != null ? double.Parse(xe.Attribute("width").Value) : 100;
-                                double height = xe.Attribute("height") != null ? double.Parse(xe.Attribute("height").Value) : 100;
-                                shapeView.DrawEllipse(width, height, color);
-                                break;
-                            }
-                        case "line":
-                            {
-                                double x1 = xe.Attribute("x1") != null ? double.Parse(xe.Attribute("x1").Value) : 0;
-                                double y1 = xe.Attribute("y1") != null ? double.Parse(xe.Attribute("y1").Value) : 0;
-                                double x2 = xe.Attribute("x2") != null ? double.Parse(xe.Attribute("x2").Value) : 100;
-                                double y2 = xe.Attribute("y2") != null ? double.Parse(xe.Attribute("y2").Value) : 100;
-                                double thickness = xe.Attribute("thickness") != null ? double.Parse(xe.Attribute("thickness").Value) : 2;
-                                shapeView.DrawLine(x1, y1, x2, y2, thickness, color);
-                                break;
-                            }
-                        case "point":
-                            {
-                                double x = xe.Attribute("x") != null ? double.Parse(xe.Attribute("x").Value) : 50;
-                                double y = xe.Attribute("y") != null ? double.Parse(xe.Attribute("y").Value) : 50;
-                                double diameter = xe.Attribute("diameter") != null ? double.Parse(xe.Attribute("diameter").Value) : 8;
-                                shapeView.DrawPoint(x, y, diameter, color);
-                                break;
-                            }
-                        default:
-                            Debug.WriteLine($"[Renderer] Unknown primitive type: {primitive}, defaulting to rectangle.");
-                            shapeView.DrawRectangle(100, 100, color);
-                            break;
-                    }
-                    if (xe.Attribute("background") != null)
-                    {
-                        Windows.UI.Color bgColor = ColorUtil.FromString(xe.Attribute("background").Value);
-                        shapeView.SetBackgroundColor(bgColor);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[Renderer] Error rendering ShapeView primitive: {ex.Message}");
-                }
-                return shapeView;
+                ToggleSwitch ts = new ToggleSwitch();
+                if (xe.Attribute(p1nspace + "text") != null)
+                    ts.Header = xe.Attribute(p1nspace + "text").Value;
+                if (xe.Attribute(p1nspace + "textOn") != null)
+                    ts.OnContent = xe.Attribute(p1nspace + "textOn").Value;
+                if (xe.Attribute(p1nspace + "textOff") != null)
+                    ts.OffContent = xe.Attribute(p1nspace + "textOff").Value;
+                if (xe.Attribute(p1nspace + "checked") != null)
+                    ts.IsOn = xe.Attribute(p1nspace + "checked").Value == "true";
+                if (xe.Attribute(p1nspace + "enabled") != null)
+                    ts.IsEnabled = xe.Attribute(p1nspace + "enabled").Value != "false";
+                ApplyCommonAttributes(ts, xe);
+                return ts;
             }
 
+            // ── ToggleButton ──────────────────────────────────────────────────────
+            else if (xeName == "ToggleButton" || xeName == "android.widget.ToggleButton")
+            {
+                ToggleButton tb = new ToggleButton();
+                if (xe.Attribute(p1nspace + "text") != null)
+                    tb.Content = xe.Attribute(p1nspace + "text").Value;
+                if (xe.Attribute(p1nspace + "textOn") != null)
+                    tb.Content = xe.Attribute(p1nspace + "textOn").Value;
+                if (xe.Attribute(p1nspace + "checked") != null)
+                    tb.IsChecked = xe.Attribute(p1nspace + "checked").Value == "true";
+                ApplyCommonAttributes(tb, xe);
+                return tb;
+            }
 
+            // ── ProgressBar ───────────────────────────────────────────────────────
+            else if (xeName == "ProgressBar" || xeName == "android.widget.ProgressBar")
+            {
+                string style = xe.Attribute("style")?.Value ?? "";
+                bool isHorizontal = style.ToLower().Contains("horizontal")
+                    || xe.Attribute(p1nspace + "max") != null;
+                if (isHorizontal)
+                {
+                    Windows.UI.Xaml.Controls.ProgressBar pb = new Windows.UI.Xaml.Controls.ProgressBar();
+                    if (xe.Attribute(p1nspace + "max") != null
+                        && double.TryParse(xe.Attribute(p1nspace + "max").Value, out var pbmax))
+                        pb.Maximum = pbmax;
+                    if (xe.Attribute(p1nspace + "progress") != null
+                        && double.TryParse(xe.Attribute(p1nspace + "progress").Value, out var pbprog))
+                        pb.Value = pbprog;
+                    if (xe.Attribute(p1nspace + "indeterminate") != null)
+                        pb.IsIndeterminate = xe.Attribute(p1nspace + "indeterminate").Value == "true";
+                    ApplyCommonAttributes(pb, xe);
+                    return pb;
+                }
+                else
+                {
+                    ProgressRing pr = new ProgressRing();
+                    pr.IsActive = true;
+                    ApplyCommonAttributes(pr, xe);
+                    return pr;
+                }
+            }
 
-            else if (xeName.Equals("ShapeView") 
-                || xeName.Equals(/*"android.ticomware.interop.ShapeView"*/"com.example.shapeviewdemo.ShapeView"))
+            // ── SeekBar ───────────────────────────────────────────────────────────
+            else if (xeName == "SeekBar"
+                  || xeName == "android.widget.SeekBar"
+                  || xeName == "android.widget.AbsSeekBar")
+            {
+                Slider slider = new Slider();
+                if (xe.Attribute(p1nspace + "max") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "max").Value, out var sbmax))
+                    slider.Maximum = sbmax;
+                if (xe.Attribute(p1nspace + "min") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "min").Value, out var sbmin))
+                    slider.Minimum = sbmin;
+                if (xe.Attribute(p1nspace + "progress") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "progress").Value, out var sbprog))
+                    slider.Value = sbprog;
+                ApplyCommonAttributes(slider, xe);
+                return slider;
+            }
+
+            // ── RatingBar ─────────────────────────────────────────────────────────
+            else if (xeName == "RatingBar" || xeName == "android.widget.RatingBar")
+            {
+                StackPanel ratingPanel = new StackPanel { Orientation = Orientation.Horizontal };
+                int numStars = 5;
+                double rating = 0;
+                if (xe.Attribute(p1nspace + "numStars") != null
+                    && int.TryParse(xe.Attribute(p1nspace + "numStars").Value, out var ns))
+                    numStars = ns;
+                if (xe.Attribute(p1nspace + "rating") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "rating").Value, out var rv))
+                    rating = rv;
+                for (int i = 1; i <= numStars; i++)
+                    ratingPanel.Children.Add(new TextBlock
+                    {
+                        Text = i <= rating ? "★" : "☆",
+                        FontSize = 24,
+                        Margin = new Thickness(2)
+                    });
+                ApplyCommonAttributes(ratingPanel, xe);
+                return ratingPanel;
+            }
+
+            // ── Spinner ───────────────────────────────────────────────────────────
+            else if (xeName == "Spinner" || xeName == "android.widget.Spinner")
+            {
+                ComboBox cb = new ComboBox();
+                cb.HorizontalAlignment = HorizontalAlignment.Stretch;
+                if (xe.Attribute(p1nspace + "prompt") != null)
+                    cb.PlaceholderText = xe.Attribute(p1nspace + "prompt").Value;
+                ApplyCommonAttributes(cb, xe);
+                return cb;
+            }
+
+            // ── ListView ──────────────────────────────────────────────────────────
+            else if (xeName == "ListView" || xeName == "android.widget.ListView")
+            {
+                Windows.UI.Xaml.Controls.ListView lv = new Windows.UI.Xaml.Controls.ListView();
+                lv.HorizontalAlignment = HorizontalAlignment.Stretch;
+                lv.VerticalAlignment = VerticalAlignment.Stretch;
+                ApplyCommonAttributes(lv, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) lv.Items.Add(child);
+                    }
+                return lv;
+            }
+
+            // ── GridView ──────────────────────────────────────────────────────────
+            else if (xeName == "GridView" || xeName == "android.widget.GridView")
+            {
+                Windows.UI.Xaml.Controls.GridView gv = new Windows.UI.Xaml.Controls.GridView();
+                gv.HorizontalAlignment = HorizontalAlignment.Stretch;
+                gv.VerticalAlignment = VerticalAlignment.Stretch;
+                ApplyCommonAttributes(gv, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) gv.Items.Add(child);
+                    }
+                return gv;
+            }
+
+            // ── RecyclerView ──────────────────────────────────────────────────────
+            else if (xeName == "android.support.v7.widget.RecyclerView"
+                  || xeName == "androidx.recyclerview.widget.RecyclerView"
+                  || xeName == "RecyclerView")
+            {
+                Windows.UI.Xaml.Controls.ListView lv = new Windows.UI.Xaml.Controls.ListView();
+                lv.HorizontalAlignment = HorizontalAlignment.Stretch;
+                lv.VerticalAlignment = VerticalAlignment.Stretch;
+                ApplyCommonAttributes(lv, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) lv.Items.Add(child);
+                    }
+                return lv;
+            }
+
+            // ── CardView ──────────────────────────────────────────────────────────
+            else if (xeName == "android.support.v7.widget.CardView"
+                  || xeName == "androidx.cardview.widget.CardView"
+                  || xeName == "CardView")
+            {
+                Border card = new Border();
+                card.CornerRadius = new CornerRadius(4);
+                card.Margin = new Thickness(8);
+                card.Padding = new Thickness(8);
+                card.Background = new SolidColorBrush(Windows.UI.Colors.White);
+                if (xe.Attribute(p1nspace + "background") != null)
+                    try { card.Background = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value)); } catch { }
+                if (xe.Attribute("{http://schemas.android.com/apk/res-auto}cardCornerRadius") != null
+                    && double.TryParse(xe.Attribute("{http://schemas.android.com/apk/res-auto}cardCornerRadius").Value, out var cr))
+                    card.CornerRadius = new CornerRadius(cr);
+                Grid cardContent = new Grid();
+                card.Child = cardContent;
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) cardContent.Children.Add(child);
+                    }
+                ApplyCommonAttributes(card, xe);
+                return card;
+            }
+
+            // ── TextInputLayout ───────────────────────────────────────────────────
+            else if (xeName == "android.support.design.widget.TextInputLayout"
+                  || xeName == "com.google.android.material.textfield.TextInputLayout")
+            {
+                StackPanel panel = new StackPanel();
+                if (xe.Attribute(p1nspace + "hint") != null)
+                    panel.Children.Add(new TextBlock
+                    {
+                        Text = xe.Attribute(p1nspace + "hint").Value,
+                        FontSize = 12,
+                        Opacity = 0.7
+                    });
+                ApplyCommonAttributes(panel, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) panel.Children.Add(child);
+                    }
+                return panel;
+            }
+
+            // ── TabLayout ─────────────────────────────────────────────────────────
+            else if (xeName == "android.support.design.widget.TabLayout"
+                  || xeName == "com.google.android.material.tabs.TabLayout")
+            {
+                Pivot pivot = new Pivot();
+                ApplyCommonAttributes(pivot, xe);
+                return pivot;
+            }
+
+            // ── BottomNavigationView ──────────────────────────────────────────────
+            else if (xeName == "android.support.design.widget.BottomNavigationView"
+                  || xeName == "com.google.android.material.bottomnavigation.BottomNavigationView")
+            {
+                CommandBar cb = new CommandBar();
+                cb.VerticalAlignment = VerticalAlignment.Bottom;
+                cb.HorizontalAlignment = HorizontalAlignment.Stretch;
+                ApplyCommonAttributes(cb, xe);
+                return cb;
+            }
+
+            // ── NavigationView ────────────────────────────────────────────────────
+            else if (xeName == "android.support.design.widget.NavigationView"
+                  || xeName == "com.google.android.material.navigation.NavigationView")
+            {
+                Windows.UI.Xaml.Controls.NavigationView nav = new Windows.UI.Xaml.Controls.NavigationView();
+                ApplyCommonAttributes(nav, xe);
+                return nav;
+            }
+
+            // ── Chip ──────────────────────────────────────────────────────────────
+            else if (xeName == "android.support.design.widget.Chip"
+                  || xeName == "com.google.android.material.chip.Chip")
+            {
+                Button chip = new Button();
+                chip.CornerRadius = new CornerRadius(16);
+                chip.Margin = new Thickness(4, 2, 4, 2);
+                chip.Padding = new Thickness(12, 4, 12, 4);
+                chip.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 224, 224, 224));
+                if (xe.Attribute(p1nspace + "text") != null)
+                    chip.Content = xe.Attribute(p1nspace + "text").Value;
+                ApplyCommonAttributes(chip, xe);
+                return chip;
+            }
+
+            // ── ChipGroup ─────────────────────────────────────────────────────────
+            else if (xeName == "android.support.design.widget.ChipGroup"
+                  || xeName == "com.google.android.material.chip.ChipGroup")
+            {
+                StackPanel chipGroup = new StackPanel { Orientation = Orientation.Horizontal };
+                chipGroup.Margin = new Thickness(4);
+                ApplyCommonAttributes(chipGroup, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) chipGroup.Children.Add(child);
+                    }
+                return chipGroup;
+            }
+
+            // ── ViewPager ─────────────────────────────────────────────────────────
+            else if (xeName == "androidx.viewpager.widget.ViewPager"
+                  || xeName == "androidx.viewpager2.widget.ViewPager2"
+                  || xeName == "android.support.v4.view.ViewPager"
+                  || xeName == "ViewPager")
+            {
+                FlipView fv = new FlipView();
+                ApplyCommonAttributes(fv, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) fv.Items.Add(child);
+                    }
+                return fv;
+            }
+
+            // ── DrawerLayout ──────────────────────────────────────────────────────
+            else if (xeName == "androidx.drawerlayout.widget.DrawerLayout"
+                  || xeName == "android.support.v4.widget.DrawerLayout"
+                  || xeName == "DrawerLayout")
+            {
+                SplitView sv = new SplitView();
+                sv.DisplayMode = SplitViewDisplayMode.Overlay;
+                ApplyCommonAttributes(sv, xe);
+                if (nestedObjs)
+                {
+                    bool firstChild = true;
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null)
+                        {
+                            if (firstChild) { sv.Content = child; firstChild = false; }
+                            else sv.Pane = child;
+                        }
+                    }
+                }
+                return sv;
+            }
+
+            // ── ShapeView ─────────────────────────────────────────────────────────
+            else if (xeName == "ShapeView"
+                  || xeName == "com.example.shapeviewdemo.ShapeView")
             {
                 Debug.WriteLine($"[Renderer] Creating ShapeView for element: {xe}");
                 ShapeView shapeView = new ShapeView(new AstoriaContext(), new AstoriaAttrSet(xe));
@@ -402,9 +997,7 @@ namespace DalvikUWPCSharp.Reassembly.UI
                     string primitive = xe.Attribute("primitive")?.Value?.ToLower() ?? "rectangle";
                     Windows.UI.Color color = Windows.UI.Colors.White;
                     if (xe.Attribute("color") != null)
-                    {
                         color = ColorUtil.FromString(xe.Attribute("color").Value);
-                    }
                     switch (primitive)
                     {
                         case "rectangle":
@@ -445,10 +1038,7 @@ namespace DalvikUWPCSharp.Reassembly.UI
                             break;
                     }
                     if (xe.Attribute("background") != null)
-                    {
-                        Windows.UI.Color bgColor = ColorUtil.FromString(xe.Attribute("background").Value);
-                        shapeView.SetBackgroundColor(bgColor);
-                    }
+                        shapeView.SetBackgroundColor(ColorUtil.FromString(xe.Attribute("background").Value));
                 }
                 catch (Exception ex)
                 {
@@ -456,95 +1046,22 @@ namespace DalvikUWPCSharp.Reassembly.UI
                 }
                 return shapeView;
             }
-            // *** experimental - begin ***
-            else if (xeName.Equals("LinearLayout"))
-            {
-                StackPanel panel = new StackPanel();
-                string orientation = xe.Attribute(p1nspace + "orientation")?.Value?.ToLower() ?? "vertical";
-                panel.Orientation = orientation == "horizontal" ? Orientation.Horizontal : Orientation.Vertical;
-                if (xe.Attribute(p1nspace + "layout_width") != null && double.TryParse(xe.Attribute(p1nspace + "layout_width").Value, out var w))
-                    panel.Width = w;
-                if (xe.Attribute(p1nspace + "layout_height") != null && double.TryParse(xe.Attribute(p1nspace + "layout_height").Value, out var h))
-                    panel.Height = h;
-                if (xe.Attribute(p1nspace + "background") != null)
-                    panel.Background = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value));
-                if (nestedObjs)
-                {
-                    foreach (XElement xe1 in xe.Elements())
-                    {
-                        panel.Children.Add(await RenderObject(xe1));
-                    }
-                }
-                return panel;
-            }
-            else if (xeName.Equals("ImageView"))
-            {
-                Image img = new Image();
-                if (xe.Attribute(p1nspace + "src") != null)
-                {
-                    string src = xe.Attribute(p1nspace + "src").Value;
-                    // TODO: resolve resource reference (e.g., @drawable/...) to actual file path
-                    // For now, just set placeholder
-                    img.Source = new Windows.UI.Xaml.Media.Imaging.BitmapImage(new Uri("ms-appx:///Assets/Square150x150Logo.png"));
-                }
-                img.Margin = new Thickness(4);
-                if (xe.Attribute(p1nspace + "layout_width") != null && double.TryParse(xe.Attribute(p1nspace + "layout_width").Value, out var w))
-                    img.Width = w;
-                if (xe.Attribute(p1nspace + "layout_height") != null && double.TryParse(xe.Attribute(p1nspace + "layout_height").Value, out var h))
-                    img.Height = h;
-                return img;
-            }
-            else if (xeName.Equals("Button"))
-            {
-                var button = new AndroidInteropLib.android.widget.Button();
-                button.CreateWinUI();
-                if (xe.Attribute(p1nspace + "text") != null)
-                    button.setText(xe.Attribute(p1nspace + "text").Value);
-                // Additional attribute mapping (background, textColor, etc.) can be added here
-                return button.WinUI;
-            }
-            else if (xeName.Equals("ScrollView"))
-            {
-                var scrollView = new AndroidInteropLib.android.widget.ScrollView();
-                if (nestedObjs)
-                {
-                    foreach (XElement xe1 in xe.Elements())
-                    {
-                        var child = await RenderObject(xe1);
-                        if (child is UIElement uiChild)
-                            scrollView.addView(uiChild);
-                    }
-                }
-                return scrollView.WinUI;
-            }
-            else if (xeName.Equals("ListView"))
-            {
-                var listView = new AndroidInteropLib.android.widget.ListView();
-                if (nestedObjs)
-                {
-                    foreach (XElement xe1 in xe.Elements())
-                    {
-                        var child = await RenderObject(xe1);
-                        if (child is UIElement uiChild)
-                            listView.addView(uiChild);
-                    }
-                }
-                return listView.WinUI;
-            }
 
-            // *** experimental - begin ***
+            // ── Unrecognised element placeholder ─────────────────────────────────
             else
             {
-                Debug.WriteLine($"[Renderer] UIElement {xe.Name.ToString()} is not currently implemented on this renderer.");
-                // Return a placeholder UI element to avoid crash
-                Border placeholder = new Border
+                Debug.WriteLine($"[Renderer] UIElement {xe.Name} is not currently implemented on this renderer.");
+                return new Border
                 {
                     Background = new SolidColorBrush(Colors.Red),
-                    Child = new TextBlock { Text = $"Not implemented: {xe.Name}", Foreground = new SolidColorBrush(Colors.White) },
+                    Child = new TextBlock
+                    {
+                        Text = $"Not implemented: {xe.Name}",
+                        Foreground = new SolidColorBrush(Colors.White)
+                    },
                     Margin = new Thickness(4),
                     CornerRadius = new CornerRadius(4)
                 };
-                return placeholder;
             }
 
         }//RenderObject end

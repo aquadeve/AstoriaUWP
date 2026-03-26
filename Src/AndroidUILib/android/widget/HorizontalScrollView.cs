@@ -4,27 +4,26 @@ using Windows.UI.Xaml.Controls;
 
 namespace AndroidInteropLib.android.widget
 {
-    public class ScrollView : ViewGroup
+    /// <summary>
+    /// A view group that allows the view hierarchy placed within it to be scrolled horizontally.
+    /// Maps to UWP ScrollViewer with horizontal scrolling.
+    /// </summary>
+    public class HorizontalScrollView : ViewGroup
     {
-        // Use field initializer so it is ready before base constructor calls CreateWinUI
         private ScrollViewer scrollViewer = new ScrollViewer();
-        private StackPanel contentPanel = new StackPanel();
+        private StackPanel contentPanel = new StackPanel { Orientation = Orientation.Horizontal };
 
-        public ScrollView() : base(null, null) { }
-
-        public override void CreateWinUI(params object[] obj)
+        public HorizontalScrollView() : base(null, null)
         {
-            scrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            scrollViewer.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+            scrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
             scrollViewer.Content = contentPanel;
             this.WinUI = scrollViewer;
         }
 
-        public void addView(object child)
+        public override void CreateWinUI(params object[] obj)
         {
-            if (child is View view)
-                contentPanel.Children.Add(view.WinUI);
-            else if (child is UIElement element)
-                contentPanel.Children.Add(element);
+            // Initialized in constructor
         }
 
         public override void addView(View view, LayoutParams param)
