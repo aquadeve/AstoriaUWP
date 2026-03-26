@@ -12,6 +12,7 @@ using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Data;
+using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
@@ -46,6 +47,10 @@ namespace DalvikUWPCSharp
 
             //RnD
             Windows.UI.Xaml.Window.Current.SizeChanged += Current_SizeChanged;
+
+            // Xbox One: apply TV safe area margins and handle gamepad input
+            XboxPlatform.ApplyTvSafeArea(this);
+            this.KeyDown += EmuPage_KeyDown;
             
         }//EmuPage end
 
@@ -385,6 +390,28 @@ namespace DalvikUWPCSharp
             GoBack(sender, null);
 
         }//EmuPage_BackRequested end
+
+
+        // Xbox gamepad input handler - maps gamepad buttons to Android input actions
+        private void EmuPage_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            var action = XboxPlatform.MapGamepadToAndroid(e.Key);
+            switch (action)
+            {
+                case AndroidInputAction.Back:
+                    GoBack(sender, null);
+                    e.Handled = true;
+                    break;
+                case AndroidInputAction.Home:
+                    GoHome(sender, null);
+                    e.Handled = true;
+                    break;
+                case AndroidInputAction.Menu:
+                    // Future: trigger Android options menu
+                    Debug.WriteLine("[EmuPage] Menu button pressed (gamepad)");
+                    break;
+            }
+        }
 
 
         // GoHome
