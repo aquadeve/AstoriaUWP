@@ -199,7 +199,7 @@ namespace DalvikUWPCSharp.Classes
 
                 case Instructions.ConstStringJumbo:
                     var csj = (ConstStringJumboOpCode)op;
-                    try { Registers[csj.Destination] = dex.GetString((int)csj.StringIndex); }
+                    try { Registers[csj.Destination] = dex.GetString(csj.StringIndex); }
                     catch { Registers[csj.Destination] = ""; }
                     break;
 
@@ -631,7 +631,7 @@ namespace DalvikUWPCSharp.Classes
         }
 
         // ── Native library scanning (apkenv-inspired) ───────────────────
-        private async Task ScanNativeLibraries()
+        private Task ScanNativeLibraries()
         {
             if (da.localAppRoot == null)
                 return;
@@ -695,7 +695,7 @@ namespace DalvikUWPCSharp.Classes
                 Debug.WriteLine("[DalvikCPU] Native library scan error: " + ex.Message);
             }
 
-            await Task.CompletedTask;
+            return Task.CompletedTask;
         }
 
     }//DalvikCPU class end

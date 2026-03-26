@@ -3,7 +3,6 @@
 // Compatible with Xbox One UWP, Windows RT x64, and ARM platforms.
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using Windows.Foundation;
 using Windows.UI;
@@ -23,7 +22,6 @@ namespace DalvikUWPCSharp.Reassembly.UI
     public class AndroidRenderSurface : UserControl
     {
         private Canvas renderCanvas;
-        private List<UIElement> drawingBuffer = new List<UIElement>();
         private Color currentColor = Colors.Black;
         private double strokeWidth = 1.0;
         private double canvasWidth;
