@@ -1,5 +1,6 @@
 using AndroidInteropLib.android.content;
 using AndroidInteropLib.android.util;
+using AndroidInteropLib.android.view;
 
 namespace AndroidInteropLib.android.widget
 {

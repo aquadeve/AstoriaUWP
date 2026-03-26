@@ -1,5 +1,6 @@
 using AndroidInteropLib.android.content;
 using AndroidInteropLib.android.util;
+using AndroidInteropLib.android.view;
 using System;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;

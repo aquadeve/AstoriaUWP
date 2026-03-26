@@ -31,7 +31,12 @@ namespace AndroidInteropLib.android.support.design.widget
 
         public void inflateMenu(int resId) { }
 
-        public Menu getMenu() { return new Menu(); }
+        private class SimpleMenu : Menu
+        {
+            // Implement Menu interface members here as needed.
+        }
+
+        public Menu getMenu() { return new SimpleMenu(); }
 
         public void setCheckedItem(int id) { }
 

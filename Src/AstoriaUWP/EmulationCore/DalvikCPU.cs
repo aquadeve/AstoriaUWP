@@ -634,7 +634,7 @@ namespace DalvikUWPCSharp.Classes
         private Task ScanNativeLibraries()
         {
             if (da.localAppRoot == null)
-                return;
+                return Task.CompletedTask;
 
             string abiName = XboxPlatform.GetAndroidAbiName();
             string libPath = Path.Combine(da.localAppRoot.Path, "lib", abiName);

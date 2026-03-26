@@ -303,7 +303,7 @@ namespace DalvikUWPCSharp.Classes
                 if (strTabOffset > 0 && strTabSize > 0 && strTabOffset + strTabSize <= rawData.Length)
                 {
                     shStrTab = new byte[strTabSize];
-                    Array.Copy(rawData, strTabOffset, shStrTab, 0, strTabSize);
+                    Array.Copy(rawData, (int)strTabOffset, shStrTab, 0, (int)strTabSize);
                 }
             }
 
@@ -339,7 +339,7 @@ namespace DalvikUWPCSharp.Classes
                 if (strTabOffset > 0 && strTabSize > 0 && strTabOffset + strTabSize <= (ulong)rawData.Length)
                 {
                     shStrTab = new byte[strTabSize];
-                    Array.Copy(rawData, (long)strTabOffset, shStrTab, 0, (long)strTabSize);
+                    Array.Copy(rawData, (int)(long)strTabOffset, shStrTab, 0, (int)(long)strTabSize);
                 }
             }
 
@@ -380,7 +380,7 @@ namespace DalvikUWPCSharp.Classes
                 byte[] strTab = new byte[dynstr.Size];
                 if (dynstr.Offset + dynstr.Size <= (ulong)rawData.Length)
                 {
-                    Array.Copy(rawData, (long)dynstr.Offset, strTab, 0, (long)dynstr.Size);
+                    Array.Copy(rawData, (int)(long)dynstr.Offset, strTab, 0, (int)(long)dynstr.Size);
                 }
 
                 int symSize = 16; // Elf32_Sym size
@@ -417,7 +417,7 @@ namespace DalvikUWPCSharp.Classes
                 byte[] strTab = new byte[dynstr.Size];
                 if (dynstr.Offset + dynstr.Size <= (ulong)rawData.Length)
                 {
-                    Array.Copy(rawData, (long)dynstr.Offset, strTab, 0, (long)dynstr.Size);
+                    Array.Copy(rawData, (int)(long)dynstr.Offset, strTab, 0, (int)(long)dynstr.Size);
                 }
 
                 int entSize = 8; // Elf32_Dyn size
@@ -458,7 +458,7 @@ namespace DalvikUWPCSharp.Classes
                 byte[] strTab = new byte[dynstr.Size];
                 if (dynstr.Offset + dynstr.Size <= (ulong)rawData.Length)
                 {
-                    Array.Copy(rawData, (long)dynstr.Offset, strTab, 0, (long)dynstr.Size);
+                    Array.Copy(rawData, (int)(long)dynstr.Offset, strTab, 0, (int)(long)dynstr.Size);
                 }
 
                 int symSize = 24; // Elf64_Sym size
@@ -496,7 +496,7 @@ namespace DalvikUWPCSharp.Classes
                 byte[] strTab = new byte[dynstr.Size];
                 if (dynstr.Offset + dynstr.Size <= (ulong)rawData.Length)
                 {
-                    Array.Copy(rawData, (long)dynstr.Offset, strTab, 0, (long)dynstr.Size);
+                    Array.Copy(rawData, (int)(long)dynstr.Offset, strTab, 0, (int)(long)dynstr.Size);
                 }
 
                 int entSize = 16; // Elf64_Dyn size

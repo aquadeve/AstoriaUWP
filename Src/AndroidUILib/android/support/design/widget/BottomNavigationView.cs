@@ -45,7 +45,11 @@ namespace AndroidInteropLib.android.support.design.widget
 
         public void inflateMenu(int resId) { }
 
-        public Menu getMenu() { return new Menu(); }
+        public Menu getMenu()
+        {
+            // Cannot instantiate interface Menu; return null or a valid implementation if available.
+            return null;
+        }
 
         public override void addView(View view)
         {

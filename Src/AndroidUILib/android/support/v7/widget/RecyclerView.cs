@@ -45,8 +45,8 @@ namespace AndroidInteropLib.android.support.v7.widget
         public abstract class LayoutManager
         {
             public abstract void layoutChildren();
-            public bool canScrollVertically() { return false; }
-            public bool canScrollHorizontally() { return false; }
+            public virtual bool canScrollVertically() { return false; }
+            public virtual bool canScrollHorizontally() { return false; }
         }
 
         public class LinearLayoutManager : LayoutManager
