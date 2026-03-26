@@ -1,0 +1,3 @@
+[submodule "apkenv"]
+	path = apkenv
+	url = https://github.com/thp/apkenv
