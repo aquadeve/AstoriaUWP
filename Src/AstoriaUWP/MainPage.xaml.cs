@@ -1,4 +1,4 @@
-using DalvicUWPCSharp.Model;
+using DalvikUWPCSharp.Model;
 using DalvikUWPCSharp.Applet;
 using DalvikUWPCSharp.Classes;
 using System;

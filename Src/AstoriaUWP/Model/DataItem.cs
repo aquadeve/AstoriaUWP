@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 //using CG.Web.MegaApiClient; // MEGA Api !
 
-namespace DalvicUWPCSharp.Model
+namespace DalvikUWPCSharp.Model
 {
     public class DataItem
     {

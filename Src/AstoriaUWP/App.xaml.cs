@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
+using DalvikUWPCSharp.Classes;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Foundation;
@@ -73,6 +74,9 @@ namespace DalvikUWPCSharp
                 // Place the frame in the current Window
                 Window.Current.Content = rootFrame;
             }
+
+            // Enable Xbox gamepad navigation if running on Xbox
+            XboxPlatform.EnableGamepadNavigation();
 
             if (rootFrame.Content == null)
             {

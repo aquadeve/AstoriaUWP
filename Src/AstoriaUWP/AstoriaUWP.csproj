@@ -197,6 +197,9 @@
     </Compile>
     <Compile Include="EmulationCore\DalvikCPU.cs" />
     <Compile Include="EmulationCore\DalvikRAM.cs" />
+    <Compile Include="EmulationCore\ElfLoader.cs" />
+    <Compile Include="EmulationCore\JniBridge.cs" />
+    <Compile Include="EmulationCore\XboxPlatform.cs" />
     <Compile Include="EmulationCore\Util.cs" />
     <Compile Include="EmuPage.xaml.cs">
       <DependentUpon>EmuPage.xaml</DependentUpon>
@@ -224,6 +227,7 @@
     <Compile Include="Reassembly\UI\AndroidToolbar.xaml.cs">
       <DependentUpon>AndroidToolbar.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Reassembly\UI\AndroidRenderSurface.cs" />
     <Compile Include="Reassembly\UI\attr.cs" />
     <Compile Include="Reassembly\UI\ColorUtil.cs" />
     <Compile Include="Reassembly\UI\CoordinatorLayout.xaml.cs">

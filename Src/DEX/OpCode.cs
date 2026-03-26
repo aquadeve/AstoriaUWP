@@ -322,7 +322,7 @@ namespace dex.net
 	public class ReturnValueOpCode : OpCode
 	{
 		// return value register-pair (8 bits)
-		internal byte Value;
+		public byte Value;
 
 		/// <summary>
 		/// Constructor for all return-* operations
@@ -480,8 +480,8 @@ namespace dex.net
 	/// </summary>
 	public class AbsConstStringOpCode<T> : OpCode
 	{
-		internal ushort Destination;
-		internal T StringIndex;
+		public ushort Destination;
+		public T StringIndex;
 
 		public AbsConstStringOpCode(string name, Instructions insn) : base (name, insn) {}
 		
