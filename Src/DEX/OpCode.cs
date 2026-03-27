@@ -522,7 +522,7 @@ namespace dex.net
 	/// </summary>
 	public class ConstClassOpCode : Register8OpCode
 	{
-		internal ushort TypeIndex;
+		public ushort TypeIndex;
 
 		internal ConstClassOpCode (BinaryReader reader) : base (reader, "const-class", Instructions.ConstClass)
 		{
@@ -586,9 +586,9 @@ namespace dex.net
 	/// </summary>
 	public class InstanceOfOpCode : OpCode
 	{
-		internal byte Destination;
-		internal byte Reference;
-		internal ushort TypeIndex;
+		public byte Destination;
+		public byte Reference;
+		public ushort TypeIndex;
 
 		internal InstanceOfOpCode (BinaryReader reader) : base ("instance-of", Instructions.InstanceOf)
 		{
@@ -607,8 +607,8 @@ namespace dex.net
 	/// </summary>
 	public class ArrayLengthOpCode : OpCode
 	{
-		internal byte Destination;
-		internal byte ArrayReference;
+		public byte Destination;
+		public byte ArrayReference;
 
 		internal ArrayLengthOpCode (BinaryReader reader) : base ("array-length", Instructions.ArrayLength)
 		{
@@ -645,9 +645,9 @@ namespace dex.net
 	/// </summary>
 	public class NewArrayOfOpCode : OpCode
 	{
-		internal byte Destination;
-		internal byte Size;
-		internal ushort TypeIndex;
+		public byte Destination;
+		public byte Size;
+		public ushort TypeIndex;
 		
 		internal NewArrayOfOpCode (BinaryReader reader) : base ("new-array", Instructions.NewArrayOf)
 		{
@@ -891,7 +891,7 @@ namespace dex.net
 	public abstract class SwitchOpCode : Register8OpCode, DataExtendedOpCode
 	{
 		// relative branch targets
-		internal int[] Targets;
+		public int[] Targets;
 		public long DataTableOffset { get; protected set; }
 
 		internal SwitchOpCode (BinaryReader reader, string name, Instructions isns) : base(reader, name, isns) 
@@ -920,7 +920,7 @@ namespace dex.net
 	/// </summary>
 	public class PackedSwitchOpCode : SwitchOpCode
 	{
-		internal int FirstKey;
+		public int FirstKey;
 
 		internal PackedSwitchOpCode (BinaryReader reader) : base(reader, "packed-switch", Instructions.PackedSwitch)
 		{
@@ -977,7 +977,7 @@ namespace dex.net
 	public class SparseSwitchOpCode : SwitchOpCode
 	{
 		// keys, sorted low-to-high
-		internal int[] Keys;
+		public int[] Keys;
 
 		internal SparseSwitchOpCode (BinaryReader reader) : base(reader, "sparse-switch", Instructions.SparseSwitch)
 		{
@@ -1037,8 +1037,8 @@ namespace dex.net
 	/// </summary>
 	public abstract class CmplOpCode : Register8OpCode
 	{
-		internal byte First;
-		internal byte Second;
+		public byte First;
+		public byte Second;
 
 		internal CmplOpCode (BinaryReader reader, string name, Instructions insn) : base(reader, name, insn)
 		{
@@ -1095,9 +1095,9 @@ namespace dex.net
 	/// </summary>
 	public abstract class IfOpCode : OpCode, IIfOpCode
 	{
-		internal byte First;
-		internal byte Second;
-		internal short Offset;
+		public byte First;
+		public byte Second;
+		public short Offset;
 
 		internal IfOpCode (BinaryReader reader, string name, Instructions insn) : base (name, insn)
 		{
@@ -1153,7 +1153,7 @@ namespace dex.net
 	/// </summary>
 	public abstract class IfzOpCode : Register8OpCode, IIfOpCode
 	{
-		internal short Offset;
+		public short Offset;
 
 		internal IfzOpCode (BinaryReader reader, string name, Instructions insn) : base(reader, name, insn)
 		{
@@ -1300,9 +1300,9 @@ namespace dex.net
 	/// </summary>
 	public abstract class IinstanceOpOpCode : OpCode
 	{
-		internal byte Destination;
-		internal byte Object;
-		internal ushort Index;
+		public byte Destination;
+		public byte Object;
+		public ushort Index;
 
 		internal IinstanceOpOpCode (BinaryReader reader, string name, Instructions insn) : base (name, insn)
 		{
@@ -1392,7 +1392,7 @@ namespace dex.net
 	/// </summary>
 	public abstract class StaticOpOpCode : Register8OpCode
 	{
-		internal ushort Index;
+		public ushort Index;
 		
 		internal StaticOpOpCode (BinaryReader reader, string name, Instructions insn) : base (reader, name, insn)
 		{
@@ -1579,9 +1579,9 @@ namespace dex.net
 	/// </summary>
 	public abstract class InvokeRangeOpCode : OpCode
 	{
-		internal byte ArgumentCount;
-		internal ushort MethodIndex;
-		internal ushort FirstArgument;
+		public byte ArgumentCount;
+		public ushort MethodIndex;
+		public ushort FirstArgument;
 
 		internal InvokeRangeOpCode (BinaryReader reader, string name, Instructions insn) : base (name, insn)
 		{
@@ -1626,8 +1626,8 @@ namespace dex.net
 	/// </summary>
 	public abstract class UnaryOpOpCode : OpCode
 	{
-		internal byte Destination;
-		internal byte Source;
+		public byte Destination;
+		public byte Source;
 
 		public UnaryOpOpCode (BinaryReader reader, string name, Instructions insn) : base (name, insn)
 		{
@@ -1930,8 +1930,8 @@ namespace dex.net
 	/// </summary>
 	public abstract class BinaryOp2OpCode : OpCode
 	{
-		internal byte Destination;
-		internal byte Source;
+		public byte Destination;
+		public byte Source;
 
 		internal BinaryOp2OpCode (BinaryReader reader, string name, Instructions insn) : base (name, insn)
 		{
@@ -2115,9 +2115,9 @@ namespace dex.net
 	/// </summary>
 	public abstract class AbsBinaryOpLit<D,S,C> : OpCode
 	{
-		internal D Destination;
-		internal S Source;
-		internal C Constant;
+		public D Destination;
+		public S Source;
+		public C Constant;
 
 		public AbsBinaryOpLit (string name, Instructions insn) : base (name, insn)
 		{
