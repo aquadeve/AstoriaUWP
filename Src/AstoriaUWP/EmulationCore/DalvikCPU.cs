@@ -1,4 +1,6 @@
-﻿// DalvikCPU
+// DalvikCPU - PC-based Dalvik bytecode interpreter for AstoriaUWP
+// Implements concepts from referenceBridge (android_init, linker, JNI bridge stubs)
+// into a functional managed C# Dalvik VM.
 
 using AndroidInteropLib;
 using AndroidInteropLib.android.content;
@@ -9,28 +11,32 @@ using dex.net;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-// DalvikUWPCSharp.Classes
 namespace DalvikUWPCSharp.Classes
 {
+    // Sentinel value to signal method return from ExecuteInstruction
+    // Positive values are branch targets (opcode byte offsets).
+    // JUMP_RETURN signals early exit from the execution loop.
+    internal static class ExecutionSignals
+    {
+        public const long CONTINUE = -1L;   // advance PC normally
+        public const long JUMP_RETURN = long.MinValue; // return from method
+    }
 
     // DalvikCPU class
     public class DalvikCPU
     {
-        //List<object> Registers = new List<object>();
         object[] Registers = new object[16];
         object result;
         public Dex dex;
         string packageName;
         public EmuPage hostPage;
         DroidApp da;
-        //int LastRegisterModified;
 
         private Context appContext;
         private Window droidWindow;
@@ -38,14 +44,33 @@ namespace DalvikUWPCSharp.Classes
         // JNI bridge for native method calls (apkenv-inspired)
         public JniEnvironment JniEnv { get; private set; }
 
+        // Android system properties (from referenceBridge android_init.cpp)
+        public AndroidProperties Properties { get; private set; }
+
+        // Dynamic linker stubs (from referenceBridge linker.cpp)
+        public DynamicLinker Linker { get; private set; }
+
         // ELF loader for parsing native .so libraries
         private Dictionary<string, ElfLoader> loadedLibraries = new Dictionary<string, ElfLoader>();
+
+        // Instance field storage: object -> (fieldName -> value)
+        private Dictionary<int, Dictionary<string, object>> instanceFields =
+            new Dictionary<int, Dictionary<string, object>>();
+
+        // Static field storage: "ClassName.fieldName" -> value
+        private Dictionary<string, object> staticFields =
+            new Dictionary<string, object>();
+
+        // Object identity counter for instanceFields keys
+        private int nextObjectId = 1;
+        private Dictionary<object, int> objectIds = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
 
         // Instruction execution count for debugging
         private int instructionCount;
 
+        // Per-call-frame saved registers (to support nested RunMethod calls)
+        private Stack<object[]> registerStack = new Stack<object[]>();
 
-        // DalvikCPU(dex, pName, host emupage)
         public DalvikCPU(Dex d, string pName, EmuPage hostPg)
         {
             dex = d;
@@ -58,22 +83,24 @@ namespace DalvikUWPCSharp.Classes
             JniEnv = new JniEnvironment();
             AndroidSystemLibraryStubs.RegisterAll(JniEnv);
 
+            // Initialize Android system properties (from referenceBridge android_init.cpp)
+            Properties = new AndroidProperties();
+
+            // Initialize dynamic linker stubs (from referenceBridge linker.cpp)
+            Linker = new DynamicLinker(Properties);
+
             // Log platform information for Xbox/ARM diagnostics
             XboxPlatform.LogPlatformInfo();
 
             // set preload status "Setting up app environment"
             hostPage.setPreloadStatusText("Setting up app environment...");
+        }
 
-        }//DalvikCPU end
-
-        // Start 
         public async void Start()
         {
             if (appContext == null)
             {
                 appContext = new AstoriaContext(da, await AstoriaResources.CreateAsync(da));
-                
-                // form Astoria Window
                 droidWindow = new AstoriaWindow(appContext, hostPage);
             }
 
@@ -81,18 +108,14 @@ namespace DalvikUWPCSharp.Classes
             await ScanNativeLibraries();
 
             // for each dex classes...
-            foreach(Class cl in dex.GetClasses())
+            foreach (Class cl in dex.GetClasses())
             {
-                //...check if package name contains MainActivity
-                if(cl.Name.Equals(packageName + ".MainActivity"))
+                if (cl.Name.Equals(packageName + ".MainActivity"))
                 {
-                    // foreach methods...
-                    foreach(Method m in cl.GetMethods())
+                    foreach (Method m in cl.GetMethods())
                     {
-                        //...check if method's name contains onCreate
-                        if(m.Name.Equals("onCreate"))
+                        if (m.Name.Equals("onCreate"))
                         {
-                            // run method m of class cl
                             RunMethod(m, cl);
                         }
                     }
@@ -100,51 +123,80 @@ namespace DalvikUWPCSharp.Classes
             }
 
             hostPage.preloadDone();
+        }
 
-        }//Start end
-
-
-        // GoBack event handler
         public async void GoBack()
         {
             var dialog = new Windows.UI.Popups.MessageDialog("Back event initiated.", "Dalvik CPU");
-
             await dialog.ShowAsync();
+        }
 
-        }// GoBack end
-
-
-        // RunMethod (m, c, obj)
+        // RunMethod with PC-based execution loop supporting branches
         public object RunMethod(Method m, Class cl, params object[] obj)
         {
-            if(!TryNativeMethod(m, cl, obj))
+            if (!TryNativeMethod(m, cl, obj))
             {
-                foreach (OpCode o in m.GetInstructions())
+                // Save current registers and push a new frame
+                registerStack.Push(Registers);
+                Registers = new object[16];
+
+                // Copy arguments into low registers
+                if (obj != null)
                 {
-                    //try
-                    //{
-                        ExecuteInstruction(o, cl);
-                    //}
-                    //catch (Exception ex)
-                    //{
-                    //    Debug.WriteLine("[ex] Dalvik CPU - RunMethod Exception : "
-                    //        + ex.Message);
-                    //}
+                    for (int i = 0; i < obj.Length && i < Registers.Length; i++)
+                        Registers[i] = obj[i];
+                }
+
+                try
+                {
+                    var instructions = m.GetInstructions().ToList();
+
+                    // Build opcode-offset -> instruction-index map for branch resolution
+                    var offsetToIndex = new Dictionary<long, int>(instructions.Count);
+                    for (int i = 0; i < instructions.Count; i++)
+                        offsetToIndex[instructions[i].OpCodeOffset] = i;
+
+                    int pc = 0;
+                    while (pc >= 0 && pc < instructions.Count)
+                    {
+                        instructionCount++;
+                        long signal = ExecuteInstruction(instructions[pc], cl);
+
+                        if (signal == ExecutionSignals.JUMP_RETURN)
+                            break;
+                        else if (signal != ExecutionSignals.CONTINUE)
+                        {
+                            // signal is a branch target offset
+                            if (offsetToIndex.TryGetValue(signal, out int idx))
+                                pc = idx;
+                            else
+                                pc++;
+                        }
+                        else
+                            pc++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[DalvikCPU] RunMethod exception: " + ex.Message);
+                }
+                finally
+                {
+                    // Restore previous frame's registers
+                    Registers = registerStack.Pop();
                 }
             }
 
             return result;
-            //dynamic MyD = new DynamicObject()
+        }
 
-        }//RunMethod end
-
-
-        // ExecuteInstruction (operand, code)
-        public void ExecuteInstruction(OpCode op, Class cl)
+        // ExecuteInstruction returns:
+        //   ExecutionSignals.CONTINUE (-1) → advance PC normally
+        //   ExecutionSignals.JUMP_RETURN   → exit method (return opcode)
+        //   >= 0 long value               → absolute byte-offset branch target
+        public long ExecuteInstruction(OpCode op, Class cl)
         {
-            instructionCount++;
-
-            switch(op.Instruction)
+            switch (op.Instruction)
             {
                 // ── NOP ──────────────────────────────────────────────────────
                 case Instructions.Nop:
@@ -203,6 +255,18 @@ namespace DalvikUWPCSharp.Classes
                     catch { Registers[csj.Destination] = ""; }
                     break;
 
+                case Instructions.ConstClass:
+                    var cc = (ConstClassOpCode)op;
+                    try
+                    {
+                        string typeName = dex.GetTypeName(cc.TypeIndex);
+                        string managed = "AndroidInteropLib." + ConvertClassName(typeName);
+                        Type t = Type.GetType(managed);
+                        Registers[cc.Destination] = t ?? (object)typeName;
+                    }
+                    catch { Registers[cc.Destination] = null; }
+                    break;
+
                 // ── MOVE ─────────────────────────────────────────────────────
                 case Instructions.Move:
                     var mov = (MoveOpCode)op;
@@ -214,14 +278,29 @@ namespace DalvikUWPCSharp.Classes
                     Registers[mf16.To] = Registers[mf16.From];
                     break;
 
+                case Instructions.Move16:
+                    var m16 = (Move16OpCode)op;
+                    Registers[m16.To] = Registers[m16.From];
+                    break;
+
                 case Instructions.MoveWide:
                     var mw = (MoveWideOpCode)op;
                     Registers[mw.To] = Registers[mw.From];
                     break;
 
+                case Instructions.MoveWideFrom16:
+                    var mwf16 = (MoveWideFrom16OpCode)op;
+                    Registers[mwf16.To] = Registers[mwf16.From];
+                    break;
+
                 case Instructions.MoveObject:
                     var mo = (MoveObjectOpCode)op;
                     Registers[mo.To] = Registers[mo.From];
+                    break;
+
+                case Instructions.MoveObjectFrom16:
+                    var mof16 = (MoveObjectFrom16OpCode)op;
+                    Registers[mof16.To] = Registers[mof16.From];
                     break;
 
                 case Instructions.MoveResult:
@@ -241,28 +320,413 @@ namespace DalvikUWPCSharp.Classes
 
                 case Instructions.MoveException:
                     var me = (MoveExceptionOpCode)op;
-                    Registers[me.Destination] = null; // Exception handling stub
+                    Registers[me.Destination] = null;
                     break;
 
                 // ── RETURN ───────────────────────────────────────────────────
                 case Instructions.ReturnVoid:
                     result = null;
-                    break;
+                    return ExecutionSignals.JUMP_RETURN;
 
                 case Instructions.ReturnValue:
                     var rv = (ReturnValueOpCode)op;
                     result = Registers[rv.Value];
-                    break;
+                    return ExecutionSignals.JUMP_RETURN;
 
                 case Instructions.ReturnWide:
                     var rw = (ReturnWideOpCode)op;
                     result = Registers[rw.Value];
-                    break;
+                    return ExecutionSignals.JUMP_RETURN;
 
                 case Instructions.ReturnObject:
                     var ro = (ReturnObjectOpCode)op;
                     result = Registers[ro.Value];
+                    return ExecutionSignals.JUMP_RETURN;
+
+                // ── GOTO ─────────────────────────────────────────────────────
+                case Instructions.Goto:
+                case Instructions.Goto16:
+                case Instructions.Goto32:
+                    return ((IGoto)op).GetTargetAddress();
+
+                // ── THROW ────────────────────────────────────────────────────
+                case Instructions.Throw:
+                    var thr = (ThrowOpCode)op;
+                    Debug.WriteLine("[DalvikCPU] throw v" + thr.Destination);
+                    return ExecutionSignals.JUMP_RETURN;
+
+                // ── MONITOR ─────────────────────────────────────────────────
+                case Instructions.MonitorEnter:
+                case Instructions.MonitorExit:
+                    // Stub: synchronization not implemented
                     break;
+
+                // ── CHECK-CAST ───────────────────────────────────────────────
+                case Instructions.CheckCast:
+                    // Stub: trust the cast succeeds
+                    break;
+
+                // ── INSTANCE-OF ──────────────────────────────────────────────
+                case Instructions.InstanceOf:
+                    var instOf = (InstanceOfOpCode)op;
+                    try
+                    {
+                        string ioTypeName = dex.GetTypeName(instOf.TypeIndex);
+                        string ioManaged = "AndroidInteropLib." + ConvertClassName(ioTypeName);
+                        Type ioType = Type.GetType(ioManaged);
+                        object ioObj = Registers[instOf.Reference];
+                        Registers[instOf.Destination] = (ioType != null && ioObj != null && ioType.IsInstanceOfType(ioObj)) ? 1 : 0;
+                    }
+                    catch { Registers[instOf.Destination] = 0; }
+                    break;
+
+                // ── ARRAY-LENGTH ─────────────────────────────────────────────
+                case Instructions.ArrayLength:
+                    var al = (ArrayLengthOpCode)op;
+                    var alArr = Registers[al.ArrayReference];
+                    if (alArr is Array alA)
+                        Registers[al.Destination] = alA.Length;
+                    else
+                        Registers[al.Destination] = 0;
+                    break;
+
+                // ── NEW-INSTANCE ─────────────────────────────────────────────
+                case Instructions.NewInstance:
+                    var ni = (NewInstanceOpCode)op;
+                    try
+                    {
+                        string typeName = dex.GetTypeName(ni.TypeIndex);
+                        string managedName = "AndroidInteropLib." + ConvertClassName(typeName);
+                        Type t = Type.GetType(managedName);
+                        if (t != null)
+                            Registers[ni.Destination] = Activator.CreateInstance(t);
+                        else
+                            Registers[ni.Destination] = new DalvikObject(typeName);
+                        Debug.WriteLine("[DalvikCPU] new-instance: " + typeName);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] new-instance error: " + ex.Message);
+                        Registers[ni.Destination] = new object();
+                    }
+                    break;
+
+                // ── NEW-ARRAY ────────────────────────────────────────────────
+                case Instructions.NewArrayOf:
+                    var na = (NewArrayOfOpCode)op;
+                    try
+                    {
+                        int size = ToInt(Registers[na.Size]);
+                        Registers[na.Destination] = new object[Math.Max(0, size)];
+                        Debug.WriteLine("[DalvikCPU] new-array size=" + size);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] new-array error: " + ex.Message);
+                        Registers[na.Destination] = new object[0];
+                    }
+                    break;
+
+                // ── PACKED-SWITCH ────────────────────────────────────────────
+                case Instructions.PackedSwitch:
+                    var ps = (PackedSwitchOpCode)op;
+                    try
+                    {
+                        int psVal = ToInt(Registers[ps.Destination]);
+                        int psIdx = psVal - ps.FirstKey;
+                        if (psIdx >= 0 && psIdx < ps.Targets.Length)
+                            return ps.GetTargetAddress(psIdx);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] packed-switch error: " + ex.Message);
+                    }
+                    break;
+
+                // ── SPARSE-SWITCH ─────────────────────────────────────────────
+                case Instructions.SparseSwitch:
+                    var ss = (SparseSwitchOpCode)op;
+                    try
+                    {
+                        int ssVal = ToInt(Registers[ss.Destination]);
+                        int[] ssKeys = ss.GetKeys();
+                        for (int i = 0; i < ssKeys.Length; i++)
+                        {
+                            if (ssKeys[i] == ssVal)
+                                return ss.GetTargetAddress(i);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] sparse-switch error: " + ex.Message);
+                    }
+                    break;
+
+                // ── COMPARE ──────────────────────────────────────────────────
+                case Instructions.CmplFloat:
+                case Instructions.CmpgFloat:
+                {
+                    var cmp = (CmplOpCode)op;
+                    float fa = ToFloat(Registers[cmp.First]);
+                    float fb = ToFloat(Registers[cmp.Second]);
+                    if (float.IsNaN(fa) || float.IsNaN(fb))
+                        Registers[cmp.Destination] = (op.Instruction == Instructions.CmpgFloat) ? 1 : -1;
+                    else
+                        Registers[cmp.Destination] = fa.CompareTo(fb);
+                    break;
+                }
+                case Instructions.CmplDouble:
+                case Instructions.CmpgDouble:
+                {
+                    var cmp = (CmplOpCode)op;
+                    double da2 = ToDouble(Registers[cmp.First]);
+                    double db2 = ToDouble(Registers[cmp.Second]);
+                    if (double.IsNaN(da2) || double.IsNaN(db2))
+                        Registers[cmp.Destination] = (op.Instruction == Instructions.CmpgDouble) ? 1 : -1;
+                    else
+                        Registers[cmp.Destination] = da2.CompareTo(db2);
+                    break;
+                }
+                case Instructions.CmpLong:
+                {
+                    var cmp = (CmplOpCode)op;
+                    long la = ToLong(Registers[cmp.First]);
+                    long lb = ToLong(Registers[cmp.Second]);
+                    Registers[cmp.Destination] = la.CompareTo(lb);
+                    break;
+                }
+
+                // ── IF (two-register) ────────────────────────────────────────
+                case Instructions.IfEq:
+                {
+                    var ifop = (IfEqOpCode)op;
+                    if (CompareValues(Registers[ifop.First], Registers[ifop.Second]) == 0)
+                        return ifop.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfNe:
+                {
+                    var ifop = (IfNeOpCode)op;
+                    if (CompareValues(Registers[ifop.First], Registers[ifop.Second]) != 0)
+                        return ifop.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfLt:
+                {
+                    var ifop = (IfLtOpCode)op;
+                    if (CompareValues(Registers[ifop.First], Registers[ifop.Second]) < 0)
+                        return ifop.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfGe:
+                {
+                    var ifop = (IfGeOpCode)op;
+                    if (CompareValues(Registers[ifop.First], Registers[ifop.Second]) >= 0)
+                        return ifop.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfGt:
+                {
+                    var ifop = (IfGtOpCode)op;
+                    if (CompareValues(Registers[ifop.First], Registers[ifop.Second]) > 0)
+                        return ifop.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfLe:
+                {
+                    var ifop = (IfLeOpCode)op;
+                    if (CompareValues(Registers[ifop.First], Registers[ifop.Second]) <= 0)
+                        return ifop.GetTargetAddress();
+                    break;
+                }
+
+                // ── IF-ZERO (one-register) ───────────────────────────────────
+                case Instructions.IfEqz:
+                {
+                    var ifz = (IfEqzOpCode)op;
+                    if (IsZeroOrNull(Registers[ifz.Destination]))
+                        return ifz.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfNez:
+                {
+                    var ifz = (IfNezOpCode)op;
+                    if (!IsZeroOrNull(Registers[ifz.Destination]))
+                        return ifz.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfLtz:
+                {
+                    var ifz = (IfLtzOpCode)op;
+                    if (ToInt(Registers[ifz.Destination]) < 0)
+                        return ifz.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfGez:
+                {
+                    var ifz = (IfGezOpCode)op;
+                    if (ToInt(Registers[ifz.Destination]) >= 0)
+                        return ifz.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfGtz:
+                {
+                    var ifz = (IfGtzOpCode)op;
+                    if (ToInt(Registers[ifz.Destination]) > 0)
+                        return ifz.GetTargetAddress();
+                    break;
+                }
+                case Instructions.IfLez:
+                {
+                    var ifz = (IfLezOpCode)op;
+                    if (ToInt(Registers[ifz.Destination]) <= 0)
+                        return ifz.GetTargetAddress();
+                    break;
+                }
+
+                // ── ARRAY GET ────────────────────────────────────────────────
+                case Instructions.Aget:
+                case Instructions.AgetWide:
+                case Instructions.AgetObject:
+                case Instructions.AgetBoolean:
+                case Instructions.AgetByte:
+                case Instructions.AgetChar:
+                case Instructions.AgetShort:
+                {
+                    var ag = (ArrayOpOpCode)op;
+                    try
+                    {
+                        var arr = Registers[ag.Array] as object[];
+                        int idx = ToInt(Registers[ag.Index]);
+                        Registers[ag.Destination] = (arr != null && idx >= 0 && idx < arr.Length) ? arr[idx] : null;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] aget error: " + ex.Message);
+                        Registers[ag.Destination] = null;
+                    }
+                    break;
+                }
+
+                // ── ARRAY PUT ────────────────────────────────────────────────
+                case Instructions.Aput:
+                case Instructions.AputWide:
+                case Instructions.AputObject:
+                case Instructions.AputBoolean:
+                case Instructions.AputByte:
+                case Instructions.AputChar:
+                case Instructions.AputShort:
+                {
+                    var ap = (ArrayOpOpCode)op;
+                    try
+                    {
+                        var arr = Registers[ap.Array] as object[];
+                        int idx = ToInt(Registers[ap.Index]);
+                        if (arr != null && idx >= 0 && idx < arr.Length)
+                            arr[idx] = Registers[ap.Destination];
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] aput error: " + ex.Message);
+                    }
+                    break;
+                }
+
+                // ── INSTANCE GET ─────────────────────────────────────────────
+                case Instructions.Iget:
+                case Instructions.IgetWide:
+                case Instructions.IgetObject:
+                case Instructions.IgetBoolean:
+                case Instructions.IgetByte:
+                case Instructions.IgetChar:
+                case Instructions.IgetShort:
+                {
+                    var ig = (IinstanceOpOpCode)op;
+                    try
+                    {
+                        Field f = dex.GetField(ig.Index);
+                        object obj2 = Registers[ig.Object];
+                        Registers[ig.Destination] = GetInstanceField(obj2, f.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] iget error: " + ex.Message);
+                        Registers[ig.Destination] = null;
+                    }
+                    break;
+                }
+
+                // ── INSTANCE PUT ─────────────────────────────────────────────
+                case Instructions.Iput:
+                case Instructions.IputWide:
+                case Instructions.IputObject:
+                case Instructions.IputBoolean:
+                case Instructions.IputByte:
+                case Instructions.IputChar:
+                case Instructions.IputShort:
+                {
+                    var ip = (IinstanceOpOpCode)op;
+                    try
+                    {
+                        Field f = dex.GetField(ip.Index);
+                        object obj2 = Registers[ip.Object];
+                        SetInstanceField(obj2, f.Name, Registers[ip.Destination]);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] iput error: " + ex.Message);
+                    }
+                    break;
+                }
+
+                // ── STATIC GET ───────────────────────────────────────────────
+                case Instructions.Sget:
+                case Instructions.SgetWide:
+                case Instructions.SgetObject:
+                case Instructions.SgetBoolean:
+                case Instructions.SgetByte:
+                case Instructions.SgetChar:
+                case Instructions.SgetShort:
+                {
+                    var sg = (StaticOpOpCode)op;
+                    try
+                    {
+                        Field f = dex.GetField(sg.Index);
+                        string className = dex.GetTypeName(f.ClassIndex);
+                        string key = className + "." + f.Name;
+                        Registers[sg.Destination] = staticFields.TryGetValue(key, out object val) ? val : null;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] sget error: " + ex.Message);
+                        Registers[sg.Destination] = null;
+                    }
+                    break;
+                }
+
+                // ── STATIC PUT ───────────────────────────────────────────────
+                case Instructions.Sput:
+                case Instructions.SputWide:
+                case Instructions.SputObject:
+                case Instructions.SputBoolean:
+                case Instructions.SputByte:
+                case Instructions.SputChar:
+                case Instructions.SputShort:
+                {
+                    var sp = (StaticOpOpCode)op;
+                    try
+                    {
+                        Field f = dex.GetField(sp.Index);
+                        string className = dex.GetTypeName(f.ClassIndex);
+                        string key = className + "." + f.Name;
+                        staticFields[key] = Registers[sp.Destination];
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] sput error: " + ex.Message);
+                    }
+                    break;
+                }
 
                 // ── INVOKE ───────────────────────────────────────────────────
                 case Instructions.InvokeVirtual:
@@ -283,6 +747,15 @@ namespace DalvikUWPCSharp.Classes
 
                 case Instructions.InvokeInterface:
                     ExecuteInvoke((InvokeInterfaceOpCode)op, cl);
+                    break;
+
+                // ── INVOKE RANGE ─────────────────────────────────────────────
+                case Instructions.InvokeVirtualRange:
+                case Instructions.InvokeSuperRange:
+                case Instructions.InvokeDirectRange:
+                case Instructions.InvokeStaticRange:
+                case Instructions.InvokeInterfaceRange:
+                    ExecuteInvokeRange((InvokeRangeOpCode)op, cl);
                     break;
 
                 // ── ARITHMETIC (int) ─────────────────────────────────────────
@@ -345,6 +818,76 @@ namespace DalvikUWPCSharp.Classes
                 case Instructions.XorInt2Addr:
                     ExecuteBinaryOp2Addr(op, (a, b) => ToInt(a) ^ ToInt(b));
                     break;
+                case Instructions.ShlInt2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToInt(a) << ToInt(b));
+                    break;
+                case Instructions.ShrInt2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToInt(a) >> ToInt(b));
+                    break;
+                case Instructions.UshrInt2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => (int)((uint)ToInt(a) >> ToInt(b)));
+                    break;
+
+                // ── ARITHMETIC (int lit8) ────────────────────────────────────
+                case Instructions.AddIntLit8:
+                    ExecuteLitOp8(op, (a, c) => ToInt(a) + c);
+                    break;
+                case Instructions.RsubIntLit8:
+                    ExecuteLitOp8(op, (a, c) => c - ToInt(a));
+                    break;
+                case Instructions.MulIntLit8:
+                    ExecuteLitOp8(op, (a, c) => ToInt(a) * c);
+                    break;
+                case Instructions.DivIntLit8:
+                    ExecuteLitOp8(op, (a, c) => c != 0 ? ToInt(a) / c : 0);
+                    break;
+                case Instructions.RemIntLit8:
+                    ExecuteLitOp8(op, (a, c) => c != 0 ? ToInt(a) % c : 0);
+                    break;
+                case Instructions.AndIntLit8:
+                    ExecuteLitOp8(op, (a, c) => ToInt(a) & c);
+                    break;
+                case Instructions.OrIntLit8:
+                    ExecuteLitOp8(op, (a, c) => ToInt(a) | c);
+                    break;
+                case Instructions.XorIntLit8:
+                    ExecuteLitOp8(op, (a, c) => ToInt(a) ^ c);
+                    break;
+                case Instructions.ShlIntLit8:
+                    ExecuteLitOp8(op, (a, c) => ToInt(a) << c);
+                    break;
+                case Instructions.ShrIntLit8:
+                    ExecuteLitOp8(op, (a, c) => ToInt(a) >> c);
+                    break;
+                case Instructions.UshrIntLit8:
+                    ExecuteLitOp8(op, (a, c) => (int)((uint)ToInt(a) >> c));
+                    break;
+
+                // ── ARITHMETIC (int lit16) ───────────────────────────────────
+                case Instructions.AddIntLit16:
+                    ExecuteLitOp16(op, (a, c) => ToInt(a) + c);
+                    break;
+                case Instructions.RsubInt:
+                    ExecuteLitOp16(op, (a, c) => c - ToInt(a));
+                    break;
+                case Instructions.MulIntLit16:
+                    ExecuteLitOp16(op, (a, c) => ToInt(a) * c);
+                    break;
+                case Instructions.DivIntLit16:
+                    ExecuteLitOp16(op, (a, c) => c != 0 ? ToInt(a) / c : 0);
+                    break;
+                case Instructions.RemIntLit16:
+                    ExecuteLitOp16(op, (a, c) => c != 0 ? ToInt(a) % c : 0);
+                    break;
+                case Instructions.AndIntLit16:
+                    ExecuteLitOp16(op, (a, c) => ToInt(a) & c);
+                    break;
+                case Instructions.OrIntLit16:
+                    ExecuteLitOp16(op, (a, c) => ToInt(a) | c);
+                    break;
+                case Instructions.XorIntLit16:
+                    ExecuteLitOp16(op, (a, c) => ToInt(a) ^ c);
+                    break;
 
                 // ── ARITHMETIC (long) ────────────────────────────────────────
                 case Instructions.AddLong:
@@ -358,6 +901,62 @@ namespace DalvikUWPCSharp.Classes
                     break;
                 case Instructions.DivLong:
                     ExecuteBinaryOp(op, (a, b) => ToLong(b) != 0 ? ToLong(a) / ToLong(b) : 0L);
+                    break;
+                case Instructions.RemLong:
+                    ExecuteBinaryOp(op, (a, b) => ToLong(b) != 0 ? ToLong(a) % ToLong(b) : 0L);
+                    break;
+                case Instructions.AndLong:
+                    ExecuteBinaryOp(op, (a, b) => ToLong(a) & ToLong(b));
+                    break;
+                case Instructions.OrLong:
+                    ExecuteBinaryOp(op, (a, b) => ToLong(a) | ToLong(b));
+                    break;
+                case Instructions.XorLong:
+                    ExecuteBinaryOp(op, (a, b) => ToLong(a) ^ ToLong(b));
+                    break;
+                case Instructions.ShlLong:
+                    ExecuteBinaryOp(op, (a, b) => ToLong(a) << ToInt(b));
+                    break;
+                case Instructions.ShrLong:
+                    ExecuteBinaryOp(op, (a, b) => ToLong(a) >> ToInt(b));
+                    break;
+                case Instructions.UshrLong:
+                    ExecuteBinaryOp(op, (a, b) => (long)((ulong)ToLong(a) >> ToInt(b)));
+                    break;
+
+                // ── ARITHMETIC (long 2addr) ──────────────────────────────────
+                case Instructions.AddLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(a) + ToLong(b));
+                    break;
+                case Instructions.SubLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(a) - ToLong(b));
+                    break;
+                case Instructions.MulLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(a) * ToLong(b));
+                    break;
+                case Instructions.DivLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(b) != 0 ? ToLong(a) / ToLong(b) : 0L);
+                    break;
+                case Instructions.RemLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(b) != 0 ? ToLong(a) % ToLong(b) : 0L);
+                    break;
+                case Instructions.AndLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(a) & ToLong(b));
+                    break;
+                case Instructions.OrLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(a) | ToLong(b));
+                    break;
+                case Instructions.XorLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(a) ^ ToLong(b));
+                    break;
+                case Instructions.ShlLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(a) << ToInt(b));
+                    break;
+                case Instructions.ShrLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToLong(a) >> ToInt(b));
+                    break;
+                case Instructions.UshrLong2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => (long)((ulong)ToLong(a) >> ToInt(b)));
                     break;
 
                 // ── ARITHMETIC (float) ───────────────────────────────────────
@@ -373,6 +972,26 @@ namespace DalvikUWPCSharp.Classes
                 case Instructions.DivFloat:
                     ExecuteBinaryOp(op, (a, b) => Math.Abs(ToFloat(b)) > float.Epsilon ? ToFloat(a) / ToFloat(b) : 0f);
                     break;
+                case Instructions.RemFloat:
+                    ExecuteBinaryOp(op, (a, b) => ToFloat(a) % ToFloat(b));
+                    break;
+
+                // ── ARITHMETIC (float 2addr) ─────────────────────────────────
+                case Instructions.AddFloat2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToFloat(a) + ToFloat(b));
+                    break;
+                case Instructions.SubFloat2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToFloat(a) - ToFloat(b));
+                    break;
+                case Instructions.MulFloat2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToFloat(a) * ToFloat(b));
+                    break;
+                case Instructions.DivFloat2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => Math.Abs(ToFloat(b)) > float.Epsilon ? ToFloat(a) / ToFloat(b) : 0f);
+                    break;
+                case Instructions.RemFloat2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToFloat(a) % ToFloat(b));
+                    break;
 
                 // ── ARITHMETIC (double) ──────────────────────────────────────
                 case Instructions.AddDouble:
@@ -387,6 +1006,26 @@ namespace DalvikUWPCSharp.Classes
                 case Instructions.DivDouble:
                     ExecuteBinaryOp(op, (a, b) => Math.Abs(ToDouble(b)) > double.Epsilon ? ToDouble(a) / ToDouble(b) : 0.0);
                     break;
+                case Instructions.RemDouble:
+                    ExecuteBinaryOp(op, (a, b) => ToDouble(a) % ToDouble(b));
+                    break;
+
+                // ── ARITHMETIC (double 2addr) ────────────────────────────────
+                case Instructions.AddDouble2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToDouble(a) + ToDouble(b));
+                    break;
+                case Instructions.SubDouble2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToDouble(a) - ToDouble(b));
+                    break;
+                case Instructions.MulDouble2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToDouble(a) * ToDouble(b));
+                    break;
+                case Instructions.DivDouble2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => Math.Abs(ToDouble(b)) > double.Epsilon ? ToDouble(a) / ToDouble(b) : 0.0);
+                    break;
+                case Instructions.RemDouble2Addr:
+                    ExecuteBinaryOp2Addr(op, (a, b) => ToDouble(a) % ToDouble(b));
+                    break;
 
                 // ── UNARY OPS ────────────────────────────────────────────────
                 case Instructions.NegInt:
@@ -397,6 +1036,9 @@ namespace DalvikUWPCSharp.Classes
                     break;
                 case Instructions.NegLong:
                     ExecuteUnaryOp(op, a => -ToLong(a));
+                    break;
+                case Instructions.NotLong:
+                    ExecuteUnaryOp(op, a => ~ToLong(a));
                     break;
                 case Instructions.NegFloat:
                     ExecuteUnaryOp(op, a => -ToFloat(a));
@@ -418,11 +1060,29 @@ namespace DalvikUWPCSharp.Classes
                 case Instructions.LongToInt:
                     ExecuteUnaryOp(op, a => (int)ToLong(a));
                     break;
+                case Instructions.LongToFloat:
+                    ExecuteUnaryOp(op, a => (float)ToLong(a));
+                    break;
+                case Instructions.LongToDouble:
+                    ExecuteUnaryOp(op, a => (double)ToLong(a));
+                    break;
                 case Instructions.FloatToInt:
                     ExecuteUnaryOp(op, a => (int)ToFloat(a));
                     break;
+                case Instructions.FloatToLong:
+                    ExecuteUnaryOp(op, a => (long)ToFloat(a));
+                    break;
+                case Instructions.FloatToDouble:
+                    ExecuteUnaryOp(op, a => (double)ToFloat(a));
+                    break;
                 case Instructions.DoubleToInt:
                     ExecuteUnaryOp(op, a => (int)ToDouble(a));
+                    break;
+                case Instructions.DoubleToLong:
+                    ExecuteUnaryOp(op, a => (long)ToDouble(a));
+                    break;
+                case Instructions.DoubleToFloat:
+                    ExecuteUnaryOp(op, a => (float)ToDouble(a));
                     break;
                 case Instructions.IntToByte:
                     ExecuteUnaryOp(op, a => (int)(byte)ToInt(a));
@@ -434,53 +1094,29 @@ namespace DalvikUWPCSharp.Classes
                     ExecuteUnaryOp(op, a => (int)(short)ToInt(a));
                     break;
 
-                // ── NEW INSTANCE ─────────────────────────────────────────────
-                case Instructions.NewInstance:
-                    var ni = (NewInstanceOpCode)op;
-                    try
-                    {
-                        string typeName = dex.GetTypeName(ni.TypeIndex);
-                        string managedName = "AndroidInteropLib." + ConvertClassName(typeName);
-                        Type t = Type.GetType(managedName);
-                        if (t != null)
-                            Registers[ni.Destination] = Activator.CreateInstance(t);
-                        else
-                            Registers[ni.Destination] = new object();
-                        Debug.WriteLine("[DalvikCPU] new-instance: " + typeName);
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine("[DalvikCPU] new-instance error: " + ex.Message);
-                        Registers[ni.Destination] = new object();
-                    }
-                    break;
-
                 default:
                     Debug.WriteLine("[DalvikCPU] Unhandled instruction: " + op.Instruction);
                     break;
             }
 
-        }//ExecuteInstruction end
+            return ExecutionSignals.CONTINUE;
+        }
 
-
-        // TryNativeMethod (m, c, obj)
+        // TryNativeMethod
         private bool TryNativeMethod(Method m, Class c, params object[] obj)
         {
-            // if method name contains "setContentView"..
             if (m.Name.Contains("setContentView"))
             {
-                // ...set contentview
                 droidWindow.setContentView((int)obj[0]);
-
                 return true;
             }
 
             string className = ConvertClassName(c.Name);
             if (className.StartsWith(packageName))
                 return false;
-            
+
             Type myType = Type.GetType("AndroidInteropLib." + className);
-            if(myType != null)
+            if (myType != null)
             {
                 TypeInfo info = myType.GetTypeInfo();
                 MethodInfo mi = info.GetDeclaredMethod(m.Name);
@@ -494,31 +1130,25 @@ namespace DalvikUWPCSharp.Classes
                     catch
                     {
                         return false;
-                    }  
+                    }
                 }
             }
 
             return false;
-
-        }//TryNativeMethod end
-
+        }
 
         // ConvertClassName
         private string ConvertClassName(string s)
         {
             return s.Replace("internal", "_internal");
+        }
 
-        }//ConvertClassName end
-
-
-        // ── Helper: Execute an invoke-family opcode ──────────────────────
+        // Execute an invoke-family opcode
         private void ExecuteInvoke(InvokeOpCode invokeOp, Class cl)
         {
             try
             {
                 Method m = dex.GetMethod(invokeOp.MethodIndex);
-
-                // Build argument array from registers
                 object[] args = new object[Math.Max(0, invokeOp.ArgumentRegisters.Length - 1)];
                 for (int i = 1; i < invokeOp.ArgumentRegisters.Length; i++)
                 {
@@ -526,12 +1156,8 @@ namespace DalvikUWPCSharp.Classes
                     args[i - 1] = regIdx < Registers.Length ? Registers[regIdx] : null;
                 }
 
-                // First try: check if it's a native method that we can handle via JNI
                 if (!TryNativeMethod(m, cl, args))
-                {
-                    // Fall back to running the method through the Dalvik VM
                     result = RunMethod(m, cl, args);
-                }
             }
             catch (Exception ex)
             {
@@ -539,17 +1165,36 @@ namespace DalvikUWPCSharp.Classes
             }
         }
 
-        // ── Helper: Execute binary arithmetic 3-register opcodes ─────────
+        // Execute an invoke-range opcode
+        private void ExecuteInvokeRange(InvokeRangeOpCode rangeOp, Class cl)
+        {
+            try
+            {
+                Method m = dex.GetMethod(rangeOp.MethodIndex);
+                int count = Math.Max(0, rangeOp.ArgumentCount - 1);
+                object[] args = new object[count];
+                for (int i = 0; i < count; i++)
+                {
+                    int regIdx = rangeOp.FirstArgument + 1 + i;
+                    args[i] = regIdx < Registers.Length ? Registers[regIdx] : null;
+                }
+
+                if (!TryNativeMethod(m, cl, args))
+                    result = RunMethod(m, cl, args);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[DalvikCPU] invoke-range exception: " + ex.Message);
+            }
+        }
+
+        // Execute binary arithmetic 3-register opcodes (Destination = FirstSource op SecondSource)
         private void ExecuteBinaryOp(OpCode op, Func<object, object, object> operation)
         {
             try
             {
-                // BinaryOpOpCode has Destination, FirstSource, SecondSource
-                var bop = (dynamic)op;
-                byte dest = (byte)bop.Destination;
-                byte srcA = (byte)bop.FirstSource;
-                byte srcB = (byte)bop.SecondSource;
-                Registers[dest] = operation(Registers[srcA], Registers[srcB]);
+                var bop = (BinaryOpOpCode)op;
+                Registers[bop.Destination] = operation(Registers[bop.FirstSource], Registers[bop.SecondSource]);
             }
             catch (Exception ex)
             {
@@ -557,15 +1202,13 @@ namespace DalvikUWPCSharp.Classes
             }
         }
 
-        // ── Helper: Execute binary arithmetic 2-address opcodes ──────────
+        // Execute binary arithmetic 2-address opcodes (Destination op= Source)
         private void ExecuteBinaryOp2Addr(OpCode op, Func<object, object, object> operation)
         {
             try
             {
-                var bop = (dynamic)op;
-                byte dest = (byte)bop.Destination;
-                byte src = (byte)bop.Source;
-                Registers[dest] = operation(Registers[dest], Registers[src]);
+                var bop = (BinaryOp2OpCode)op;
+                Registers[bop.Destination] = operation(Registers[bop.Destination], Registers[bop.Source]);
             }
             catch (Exception ex)
             {
@@ -573,15 +1216,41 @@ namespace DalvikUWPCSharp.Classes
             }
         }
 
-        // ── Helper: Execute unary operations ─────────────────────────────
+        // Execute int/lit8 operations (Destination = Source op sbyte-literal)
+        private void ExecuteLitOp8(OpCode op, Func<object, int, object> operation)
+        {
+            try
+            {
+                var lit = (BinaryOpLit8OpCode)op;
+                Registers[lit.Destination] = operation(Registers[lit.Source], (int)lit.Constant);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[DalvikCPU] LitOp8 error: " + ex.Message);
+            }
+        }
+
+        // Execute int/lit16 operations (Destination = Source op short-literal)
+        private void ExecuteLitOp16(OpCode op, Func<object, int, object> operation)
+        {
+            try
+            {
+                var lit = (BinaryOpLit16OpCode)op;
+                Registers[lit.Destination] = operation(Registers[lit.Source], (int)lit.Constant);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[DalvikCPU] LitOp16 error: " + ex.Message);
+            }
+        }
+
+        // Execute unary operations
         private void ExecuteUnaryOp(OpCode op, Func<object, object> operation)
         {
             try
             {
-                var uop = (dynamic)op;
-                byte dest = (byte)uop.Destination;
-                byte src = (byte)uop.Source;
-                Registers[dest] = operation(Registers[src]);
+                var uop = (UnaryOpOpCode)op;
+                Registers[uop.Destination] = operation(Registers[uop.Source]);
             }
             catch (Exception ex)
             {
@@ -599,6 +1268,7 @@ namespace DalvikUWPCSharp.Classes
             if (o is double d) return (int)d;
             if (o is short s) return s;
             if (o is byte b) return b;
+            if (o is bool bo) return bo ? 1 : 0;
             try { return Convert.ToInt32(o); } catch { return 0; }
         }
 
@@ -608,6 +1278,7 @@ namespace DalvikUWPCSharp.Classes
             if (o is long l) return l;
             if (o is int i) return i;
             if (o is double d) return (long)d;
+            if (o is float f) return (long)f;
             try { return Convert.ToInt64(o); } catch { return 0L; }
         }
 
@@ -617,6 +1288,7 @@ namespace DalvikUWPCSharp.Classes
             if (o is float f) return f;
             if (o is int i) return i;
             if (o is double d) return (float)d;
+            if (o is long l) return l;
             try { return Convert.ToSingle(o); } catch { return 0f; }
         }
 
@@ -630,7 +1302,96 @@ namespace DalvikUWPCSharp.Classes
             try { return Convert.ToDouble(o); } catch { return 0.0; }
         }
 
-        // ── Native library scanning (apkenv-inspired) ───────────────────
+        // Compare two register values for if-* instructions
+        private static int CompareValues(object a, object b)
+        {
+            if (a == null && b == null) return 0;
+            if (a == null) return -1;
+            if (b == null) return 1;
+            if (a is int ai && b is int bi) return ai.CompareTo(bi);
+            if (a is long al && b is long bl) return al.CompareTo(bl);
+            if (a is float af && b is float bf) return af.CompareTo(bf);
+            if (a is double ad && b is double bd) return ad.CompareTo(bd);
+            // Reference comparison
+            return ReferenceEquals(a, b) ? 0 : 1;
+        }
+
+        // Check if register value is zero/null for if-*z instructions
+        private static bool IsZeroOrNull(object o)
+        {
+            if (o == null) return true;
+            if (o is int i) return i == 0;
+            if (o is long l) return l == 0;
+            if (o is float f) return f == 0f;
+            if (o is double d) return d == 0.0;
+            if (o is bool b) return !b;
+            return false;
+        }
+
+        // ── Instance field storage helpers ───────────────────────────────
+        private int GetObjectId(object obj)
+        {
+            if (obj == null) return 0;
+            if (!objectIds.TryGetValue(obj, out int id))
+            {
+                id = nextObjectId++;
+                objectIds[obj] = id;
+            }
+            return id;
+        }
+
+        private object GetInstanceField(object obj, string fieldName)
+        {
+            int id = GetObjectId(obj);
+            if (id == 0) return null;
+
+            // Try managed .NET reflection first
+            if (obj != null && !(obj is DalvikObject))
+            {
+                try
+                {
+                    var fi = obj.GetType().GetField(fieldName);
+                    if (fi != null) return fi.GetValue(obj);
+                    var pi = obj.GetType().GetProperty(fieldName);
+                    if (pi != null) return pi.GetValue(obj);
+                }
+                catch { }
+            }
+
+            // Fall back to our dalvik field dictionary
+            if (instanceFields.TryGetValue(id, out var fields) && fields.TryGetValue(fieldName, out object val))
+                return val;
+            return null;
+        }
+
+        private void SetInstanceField(object obj, string fieldName, object value)
+        {
+            int id = GetObjectId(obj);
+            if (id == 0) return;
+
+            // Try managed .NET reflection first
+            if (obj != null && !(obj is DalvikObject))
+            {
+                try
+                {
+                    var fi = obj.GetType().GetField(fieldName);
+                    if (fi != null) { fi.SetValue(obj, value); return; }
+                    var pi = obj.GetType().GetProperty(fieldName);
+                    if (pi != null) { pi.SetValue(obj, value); return; }
+                }
+                catch { }
+            }
+
+            // Fall back to our dalvik field dictionary
+            if (!instanceFields.TryGetValue(id, out var fields))
+            {
+                fields = new Dictionary<string, object>();
+                instanceFields[id] = fields;
+            }
+            fields[fieldName] = value;
+        }
+
+        // ── Native library scanning (apkenv-inspired) ────────────────────
         private Task ScanNativeLibraries()
         {
             if (da.localAppRoot == null)
@@ -643,7 +1404,6 @@ namespace DalvikUWPCSharp.Classes
             {
                 if (!Directory.Exists(libPath))
                 {
-                    // Try fallback ABI paths
                     string[] fallbacks = { "armeabi-v7a", "armeabi", "x86", "x86_64", "arm64-v8a" };
                     foreach (string fallback in fallbacks)
                     {
@@ -669,18 +1429,15 @@ namespace DalvikUWPCSharp.Classes
                             {
                                 string libName = Path.GetFileName(soFile);
                                 loadedLibraries[libName] = loader;
+                                Linker.RegisterLoadedLibrary(libName, loader);
 
                                 Debug.WriteLine("[DalvikCPU] Loaded native library: " + libName +
                                     " (" + loader.GetArchitectureName() +
                                     ", " + loader.ExportedFunctions.Count + " exports, " +
                                     loader.NeededLibraries.Count + " dependencies)");
 
-                                // Log JNI exports
-                                var jniExports = loader.GetJniExports();
-                                foreach (string jniFunc in jniExports)
-                                {
+                                foreach (string jniFunc in loader.GetJniExports())
                                     Debug.WriteLine("[DalvikCPU]   JNI export: " + jniFunc);
-                                }
                             }
                         }
                         catch (Exception ex)
@@ -698,67 +1455,23 @@ namespace DalvikUWPCSharp.Classes
             return Task.CompletedTask;
         }
 
-    }//DalvikCPU class end
+    }
 
-
-    /*
-    public class DalvikClass
+    // Minimal heap-allocated object to represent a Dalvik class instance when no managed type exists
+    public class DalvikObject
     {
-        Type super;
-        //object super;
-        Class c;
-        DalvikCPU cpu;
+        public string TypeName { get; }
+        public DalvikObject(string typeName) { TypeName = typeName; }
+        public override string ToString() => "[DalvikObject: " + TypeName + "]";
+    }
 
-        public DalvikClass(Class c, DalvikCPU dc)
-        {
-            this.c = c;
-            cpu = dc;
+    // Reference equality comparer for object identity keys
+    internal sealed class ReferenceEqualityComparer : IEqualityComparer<object>
+    {
+        public static readonly ReferenceEqualityComparer Instance = new ReferenceEqualityComparer();
+        private ReferenceEqualityComparer() { }
+        public new bool Equals(object x, object y) => ReferenceEquals(x, y);
+        public int GetHashCode(object obj) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
+    }
 
-            if("AndroidInteropLib" + c.SuperClass == "")
-            {
-                //set super to native class
-            }
-        }
-
-        public void SetInheritence(Type t)
-        {
-            super = t;
-        }
-
-        public object RunMethod(string name, params object[] obj)
-        {
-            //Check if current class has method. If not, check super.
-            var meth = c.GetMethods().FirstOrDefault(x => x.Name.Equals(name));
-            if (meth != null)
-                return cpu.RunMethod(meth, c);
-
-            if (super != null)
-            {
-                TypeInfo info = super.GetTypeInfo();
-                MethodInfo mi = info.GetDeclaredMethod(name);
-                if (mi != null)
-                {
-                    try
-                    {
-                        return mi.Invoke(this, obj);
-                    }
-                    catch
-                    {
-                        return null;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        // GetSuperType
-        private Type GetSuperType()
-        {
-            return super;
-        }
-
-    }//DalvikClass end
-    */
-
-}//DalvikUWPCSharp.Classes namespace end
+}
