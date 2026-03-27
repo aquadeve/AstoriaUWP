@@ -110,11 +110,26 @@ namespace DalvikUWPCSharp.Classes
             // Scan for native libraries in the APK (apkenv-inspired)
             await ScanNativeLibraries();
 
+            // Determine the main activity class to launch.
+            // Prefer the launcher activity from AndroidManifest; fall back to "<package>.MainActivity".
+            string mainActivityClass = packageName + ".MainActivity";
+            if (da.metadata?.mainActivity != null)
+            {
+                string raw = da.metadata.mainActivity.Trim();
+                if (raw.StartsWith("."))
+                    mainActivityClass = packageName + raw;          // relative: ".MyActivity" -> "com.example.MyActivity"
+                else if (!raw.Contains("."))
+                    mainActivityClass = packageName + "." + raw;    // unqualified: "MyActivity" -> "com.example.MyActivity"
+                else
+                    mainActivityClass = raw;                        // fully-qualified
+            }
+            Debug.WriteLine("[DalvikCPU] Looking for launcher activity: " + mainActivityClass);
+
             // Find and execute the app's main activity onCreate
             bool foundActivity = false;
             foreach (Class cl in dex.GetClasses())
             {
-                if (cl.Name.Equals(packageName + ".MainActivity"))
+                if (cl.Name.Equals(mainActivityClass))
                 {
                     foundActivity = true;
                     Debug.WriteLine("[DalvikCPU] Found MainActivity: " + cl.Name);
@@ -131,7 +146,7 @@ namespace DalvikUWPCSharp.Classes
             }
 
             if (!foundActivity)
-                Debug.WriteLine("[DalvikCPU] WARNING: MainActivity (" + packageName + ".MainActivity) not found in DEX.");
+                Debug.WriteLine("[DalvikCPU] WARNING: MainActivity (" + mainActivityClass + ") not found in DEX.");
 
             hostPage.preloadDone();
         }
@@ -1208,7 +1223,9 @@ namespace DalvikUWPCSharp.Classes
                     args[i - 1] = regIdx < Registers.Length ? Registers[regIdx] : null;
                 }
 
-                Debug.WriteLine("[DalvikCPU] " + invokeOp.Instruction + " " + dex.GetTypeName(m.ClassIndex) + "." + m.Name + " args=" + args.Length);
+                string invokeTypeName;
+                try { invokeTypeName = dex.GetTypeName(m.ClassIndex); } catch { invokeTypeName = "(unknown)"; }
+                Debug.WriteLine("[DalvikCPU] " + invokeOp.Instruction + " " + invokeTypeName + "." + m.Name + " args=" + args.Length);
                 if (!TryNativeMethod(m, cl, args))
                     result = RunMethod(m, cl, args);
             }
@@ -1231,7 +1248,9 @@ namespace DalvikUWPCSharp.Classes
                     args[i] = regIdx < Registers.Length ? Registers[regIdx] : null;
                 }
 
-                Debug.WriteLine("[DalvikCPU] invoke-range " + dex.GetTypeName(m.ClassIndex) + "." + m.Name + " args=" + count);
+                string rangeTypeName;
+                try { rangeTypeName = dex.GetTypeName(m.ClassIndex); } catch { rangeTypeName = "(unknown)"; }
+                Debug.WriteLine("[DalvikCPU] invoke-range " + rangeTypeName + "." + m.Name + " args=" + count);
 
                 if (!TryNativeMethod(m, cl, args))
                     result = RunMethod(m, cl, args);

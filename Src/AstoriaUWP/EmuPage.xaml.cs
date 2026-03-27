@@ -142,16 +142,35 @@ namespace DalvikUWPCSharp
         {
             StorageFile sf = null;
             bool hasLayout = false;
+
+            // Try to find the main layout XML. Check several common names used by Android apps.
+            // If the app calls setContentView() at runtime, this fallback may not matter, but it
+            // provides a best-effort static render for apps that declare a simple main layout.
             try
             {
                 var layout = await UIRenderer.CurrentApp.resFolder.GetFolderAsync("layout");
-                sf = await layout.GetFileAsync("activity_main.xml");
-                hasLayout = true;
-                Debug.WriteLine("[EmuPage] [Render] Found activity_main.xml in res/layout.");
+
+                // Candidate layout file names in priority order
+                string[] candidateLayouts = { "activity_main.xml", "main.xml", "main_activity.xml",
+                                              "content_main.xml", "fragment_main.xml" };
+                foreach (string candidate in candidateLayouts)
+                {
+                    try
+                    {
+                        sf = await layout.GetFileAsync(candidate);
+                        hasLayout = true;
+                        Debug.WriteLine("[EmuPage] [Render] Found layout: " + candidate);
+                        break;
+                    }
+                    catch { /* try next */ }
+                }
+
+                if (!hasLayout)
+                    Debug.WriteLine("[EmuPage] [Render] No standard layout XML found in res/layout.");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                Debug.WriteLine("[EmuPage] [Render] activity_main.xml not found: " + ex.Message);
+                Debug.WriteLine("[EmuPage] [Render] res/layout folder not found: " + ex.Message);
                 Debug.WriteLine("[EmuPage] [Render] App has no XML layout - using native render surface.");
             }
 

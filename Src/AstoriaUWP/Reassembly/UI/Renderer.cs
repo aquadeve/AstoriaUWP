@@ -1069,6 +1069,195 @@ namespace DalvikUWPCSharp.Reassembly.UI
                 return surface;
             }
 
+            // ── HorizontalScrollView ──────────────────────────────────────────────
+            else if (xeName == "HorizontalScrollView" || xeName == "android.widget.HorizontalScrollView")
+            {
+                ScrollViewer sv = new ScrollViewer();
+                sv.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+                sv.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
+                StackPanel content = new StackPanel { Orientation = Orientation.Horizontal };
+                sv.Content = content;
+                ApplyCommonAttributes(sv, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) content.Children.Add(child);
+                    }
+                return sv;
+            }
+
+            // ── NestedScrollView ──────────────────────────────────────────────────
+            else if (xeName == "androidx.core.widget.NestedScrollView"
+                  || xeName == "android.support.v4.widget.NestedScrollView"
+                  || xeName == "NestedScrollView")
+            {
+                ScrollViewer sv = new ScrollViewer();
+                sv.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+                StackPanel content = new StackPanel();
+                sv.Content = content;
+                ApplyCommonAttributes(sv, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) content.Children.Add(child);
+                    }
+                return sv;
+            }
+
+            // ── TableLayout ───────────────────────────────────────────────────────
+            else if (xeName == "TableLayout" || xeName == "android.widget.TableLayout")
+            {
+                Grid tbl = new Grid();
+                ApplyCommonAttributes(tbl, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) tbl.Children.Add(child);
+                    }
+                return tbl;
+            }
+
+            // ── TableRow ──────────────────────────────────────────────────────────
+            else if (xeName == "TableRow" || xeName == "android.widget.TableRow")
+            {
+                StackPanel row = new StackPanel { Orientation = Orientation.Horizontal };
+                ApplyCommonAttributes(row, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) row.Children.Add(child);
+                    }
+                return row;
+            }
+
+            // ── WebView ───────────────────────────────────────────────────────────
+            else if (xeName == "WebView" || xeName == "android.webkit.WebView")
+            {
+                WebView wv = new WebView();
+                wv.HorizontalAlignment = HorizontalAlignment.Stretch;
+                wv.VerticalAlignment = VerticalAlignment.Stretch;
+                ApplyCommonAttributes(wv, xe);
+                return wv;
+            }
+
+            // ── VideoView ─────────────────────────────────────────────────────────
+            else if (xeName == "VideoView" || xeName == "android.widget.VideoView")
+            {
+                MediaElement me = new MediaElement();
+                me.HorizontalAlignment = HorizontalAlignment.Stretch;
+                me.VerticalAlignment = VerticalAlignment.Stretch;
+                ApplyCommonAttributes(me, xe);
+                return me;
+            }
+
+            // ── Space ─────────────────────────────────────────────────────────────
+            else if (xeName == "Space" || xeName == "android.widget.Space")
+            {
+                var spacer = new Border();
+                ApplyCommonAttributes(spacer, xe);
+                return spacer;
+            }
+
+            // ── ViewStub ──────────────────────────────────────────────────────────
+            else if (xeName == "ViewStub" || xeName == "android.view.ViewStub")
+            {
+                // ViewStub is lazy-inflated at runtime; emit an invisible placeholder
+                var stub = new Border { Visibility = Visibility.Collapsed };
+                return stub;
+            }
+
+            // ── ViewAnimator / ViewSwitcher / ViewFlipper ─────────────────────────
+            else if (xeName == "ViewAnimator" || xeName == "ViewSwitcher"
+                  || xeName == "ViewFlipper"  || xeName == "android.widget.ViewAnimator"
+                  || xeName == "android.widget.ViewSwitcher"
+                  || xeName == "android.widget.ViewFlipper")
+            {
+                Grid container = new Grid();
+                ApplyCommonAttributes(container, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) container.Children.Add(child);
+                    }
+                return container;
+            }
+
+            // ── ImageButton ───────────────────────────────────────────────────────
+            else if (xeName == "ImageButton" || xeName == "android.widget.ImageButton")
+            {
+                Button btn = new Button();
+                btn.Padding = new Thickness(4);
+                if (xe.Attribute(p1nspace + "src") != null)
+                {
+                    // Use a TextBlock fallback since we may not have the drawable
+                    btn.Content = xe.Attribute(p1nspace + "src").Value;
+                }
+                ApplyCommonAttributes(btn, xe);
+                return btn;
+            }
+
+            // ── RatingBar ─────────────────────────────────────────────────────────
+            else if (xeName == "RatingBar" || xeName == "android.widget.RatingBar")
+            {
+                Slider ratingSlider = new Slider();
+                ratingSlider.Minimum = 0;
+                ratingSlider.Maximum = 5;
+                ratingSlider.StepFrequency = 1;
+                if (xe.Attribute(p1nspace + "numStars") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "numStars").Value, out var stars))
+                    ratingSlider.Maximum = stars;
+                ApplyCommonAttributes(ratingSlider, xe);
+                return ratingSlider;
+            }
+
+            // ── TimePicker / DatePicker ────────────────────────────────────────────
+            else if (xeName == "TimePicker" || xeName == "android.widget.TimePicker")
+            {
+                TimePicker tp = new TimePicker();
+                ApplyCommonAttributes(tp, xe);
+                return tp;
+            }
+            else if (xeName == "DatePicker" || xeName == "android.widget.DatePicker")
+            {
+                CalendarDatePicker cdp = new CalendarDatePicker();
+                ApplyCommonAttributes(cdp, xe);
+                return cdp;
+            }
+
+            // ── NumberPicker ──────────────────────────────────────────────────────
+            else if (xeName == "NumberPicker" || xeName == "android.widget.NumberPicker")
+            {
+                Slider slider = new Slider();
+                ApplyCommonAttributes(slider, xe);
+                return slider;
+            }
+
+            // ── CalendarView ──────────────────────────────────────────────────────
+            else if (xeName == "CalendarView" || xeName == "android.widget.CalendarView")
+            {
+                CalendarView cal = new CalendarView();
+                ApplyCommonAttributes(cal, xe);
+                return cal;
+            }
+
+            // ── AutoCompleteTextView / MultiAutoCompleteTextView ──────────────────
+            else if (xeName == "AutoCompleteTextView"
+                  || xeName == "MultiAutoCompleteTextView"
+                  || xeName == "android.widget.AutoCompleteTextView"
+                  || xeName == "android.widget.MultiAutoCompleteTextView")
+            {
+                AutoSuggestBox asb = new AutoSuggestBox();
+                if (xe.Attribute(p1nspace + "hint") != null)
+                    asb.PlaceholderText = xe.Attribute(p1nspace + "hint").Value;
+                ApplyCommonAttributes(asb, xe);
+                return asb;
+            }
+
             // ── Unrecognised element placeholder ─────────────────────────────────
             else
             {

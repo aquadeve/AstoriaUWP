@@ -159,13 +159,33 @@ namespace DalvikUWPCSharp.Applet
             // Experimental case: Step-by-Step extraction APK contents to localAppRoot
             try
             {
+                char[] invalidPathChars = Path.GetInvalidPathChars();
                 using (ZipArchive zip = ZipFile.OpenRead(copiedFile.Path))
                 {
                     foreach (ZipArchiveEntry entry in zip.Entries)
                     {
                         if (!entry.FullName.EndsWith("/"))
                         {
-                            var extractPath = Path.Combine(localAppRoot.Path, entry.FullName);
+                            // Sanitize the entry name: replace backslashes, strip leading slashes,
+                            // and skip entries whose names contain path-invalid characters like ':'.
+                            string entryName = entry.FullName.Replace('\\', '/').TrimStart('/');
+                            if (entryName.IndexOfAny(invalidPathChars) >= 0)
+                            {
+                                Debug.WriteLine("[WARN] Skipping APK entry with invalid path chars: " + entry.FullName);
+                                continue;
+                            }
+
+                            string extractPath;
+                            try
+                            {
+                                extractPath = Path.Combine(localAppRoot.Path, entryName);
+                            }
+                            catch (ArgumentException argEx)
+                            {
+                                Debug.WriteLine("[WARN] Skipping APK entry (bad path): " + entry.FullName + " - " + argEx.Message);
+                                continue;
+                            }
+
                             var directoryPath = Path.GetDirectoryName(extractPath);
                             if (!Directory.Exists(directoryPath))
                             {

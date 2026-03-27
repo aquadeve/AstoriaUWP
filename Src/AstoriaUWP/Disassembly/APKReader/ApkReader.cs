@@ -168,6 +168,11 @@ namespace DalvikUWPCSharp.Disassembly.APKReader
                 
                 info.packageName = FindInDocument(doc, "manifest", "package");
 
+                // Extract launcher activity class from AndroidManifest
+                info.mainActivity = FindLauncherActivity(doc);
+                if (info.mainActivity != null)
+                    Debug.WriteLine("[ApkReader] Launcher activity: " + info.mainActivity);
+
                 int labelID;
                 info.label = FindInDocument(doc, "application", "label");
 
@@ -343,6 +348,55 @@ namespace DalvikUWPCSharp.Disassembly.APKReader
             return null;
 
         }//FindInDocument end
+
+
+        // FindLauncherActivity - finds the activity declared with android.intent.action.MAIN
+        // and android.intent.category.LAUNCHER intent filter in AndroidManifest.xml.
+        private String FindLauncherActivity(XmlDocument doc)
+        {
+            try
+            {
+                XmlNodeList activities = doc.GetElementsByTagName("activity");
+                for (int i = 0; i < activities.Count; i++)
+                {
+                    XmlNode activity = activities.Item(i);
+                    if (activity.NodeType != XmlNodeType.Element) continue;
+
+                    foreach (XmlNode child in activity.ChildNodes)
+                    {
+                        if (child.Name != "intent-filter") continue;
+
+                        bool hasMainAction = false;
+                        bool hasLauncherCategory = false;
+
+                        foreach (XmlNode filterChild in child.ChildNodes)
+                        {
+                            // Attribute name can appear as "name" or "android:name"
+                            XmlNode nameAttr = filterChild.Attributes?.GetNamedItem("name")
+                                           ?? filterChild.Attributes?.GetNamedItem("android:name");
+                            string nameVal = nameAttr?.Value ?? "";
+
+                            if (filterChild.Name == "action" && nameVal == "android.intent.action.MAIN")
+                                hasMainAction = true;
+                            if (filterChild.Name == "category" && nameVal == "android.intent.category.LAUNCHER")
+                                hasLauncherCategory = true;
+                        }
+
+                        if (hasMainAction && hasLauncherCategory)
+                        {
+                            XmlNode actNameAttr = activity.Attributes?.GetNamedItem("name")
+                                               ?? activity.Attributes?.GetNamedItem("android:name");
+                            return actNameAttr?.Value;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[ApkReader] FindLauncherActivity error: " + ex.Message);
+            }
+            return null;
+        }//FindLauncherActivity end
 
 
 
