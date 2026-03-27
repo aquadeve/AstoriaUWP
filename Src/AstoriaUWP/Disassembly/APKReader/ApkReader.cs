@@ -355,13 +355,6 @@ namespace DalvikUWPCSharp.Disassembly.APKReader
             if (node?.Attributes == null)
                 return null;
 
-            foreach (string name in names)
-            {
-                XmlNode attr = node.Attributes.GetNamedItem(name);
-                if (attr != null && !string.IsNullOrWhiteSpace(attr.Value))
-                    return attr.Value;
-            }
-
             foreach (XmlAttribute attr in node.Attributes)
             {
                 foreach (string name in names)
@@ -389,7 +382,7 @@ namespace DalvikUWPCSharp.Disassembly.APKReader
 
             foreach (XmlNode filterChild in node.ChildNodes)
             {
-                string nameVal = GetAttributeValue(filterChild, "name", "android:name") ?? "";
+                string nameVal = GetAttributeValue(filterChild, "name", "android:name");
                 string childName = filterChild.LocalName ?? filterChild.Name;
 
                 if (childName.Equals("action", StringComparison.OrdinalIgnoreCase)
@@ -404,7 +397,7 @@ namespace DalvikUWPCSharp.Disassembly.APKReader
             return hasMainAction && hasLauncherCategory;
         }
 
-        private string FindLauncherComponent(XmlNodeList nodes, string targetAttributeName = null)
+        private string FindLauncherComponent(XmlNodeList nodes, string preferredAttributeName = null)
         {
             for (int i = 0; i < nodes.Count; i++)
             {
@@ -417,9 +410,9 @@ namespace DalvikUWPCSharp.Disassembly.APKReader
                     if (!IsLauncherIntentFilter(child))
                         continue;
 
-                    if (!string.IsNullOrEmpty(targetAttributeName))
+                    if (!string.IsNullOrWhiteSpace(preferredAttributeName))
                     {
-                        string targetActivity = GetAttributeValue(node, targetAttributeName, "android:" + targetAttributeName);
+                        string targetActivity = GetAttributeValue(node, preferredAttributeName, "android:" + preferredAttributeName);
                         if (!string.IsNullOrWhiteSpace(targetActivity))
                             return targetActivity;
                     }
