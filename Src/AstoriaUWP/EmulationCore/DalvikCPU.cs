@@ -7,6 +7,7 @@ using AndroidInteropLib.android.content;
 using AndroidInteropLib.android.view;
 using DalvikUWPCSharp.Applet;
 using DalvikUWPCSharp.Reassembly;
+using DalvikUWPCSharp.Reassembly.UI;
 using dex.net;
 using System;
 using System.Collections.Generic;
@@ -16,6 +17,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.UI.Xaml;
 
 namespace DalvikUWPCSharp.Classes
 {
@@ -102,25 +104,34 @@ namespace DalvikUWPCSharp.Classes
             {
                 appContext = new AstoriaContext(da, await AstoriaResources.CreateAsync(da));
                 droidWindow = new AstoriaWindow(appContext, hostPage);
+                Debug.WriteLine("[DalvikCPU] App context and window created.");
             }
 
             // Scan for native libraries in the APK (apkenv-inspired)
             await ScanNativeLibraries();
 
-            // for each dex classes...
+            // Find and execute the app's main activity onCreate
+            bool foundActivity = false;
             foreach (Class cl in dex.GetClasses())
             {
                 if (cl.Name.Equals(packageName + ".MainActivity"))
                 {
+                    foundActivity = true;
+                    Debug.WriteLine("[DalvikCPU] Found MainActivity: " + cl.Name);
                     foreach (Method m in cl.GetMethods())
                     {
                         if (m.Name.Equals("onCreate"))
                         {
+                            Debug.WriteLine("[DalvikCPU] Calling MainActivity.onCreate...");
                             RunMethod(m, cl);
+                            Debug.WriteLine("[DalvikCPU] MainActivity.onCreate returned.");
                         }
                     }
                 }
             }
+
+            if (!foundActivity)
+                Debug.WriteLine("[DalvikCPU] WARNING: MainActivity (" + packageName + ".MainActivity) not found in DEX.");
 
             hostPage.preloadDone();
         }
@@ -1107,7 +1118,48 @@ namespace DalvikUWPCSharp.Classes
         {
             if (m.Name.Contains("setContentView"))
             {
-                droidWindow.setContentView((int)obj[0]);
+                try
+                {
+                    object arg0 = obj != null && obj.Length > 0 ? obj[0] : null;
+                    if (arg0 is int layoutResID)
+                    {
+                        Debug.WriteLine("[DalvikCPU] setContentView(int=" + layoutResID + ")");
+                        droidWindow.setContentView(layoutResID);
+                    }
+                    else if (arg0 is AndroidInteropLib.android.view.View viewArg)
+                    {
+                        Debug.WriteLine("[DalvikCPU] setContentView(View=" + viewArg.GetType().Name + ")");
+                        droidWindow.setContentView(viewArg);
+                    }
+                    else if (arg0 is DalvikObject dalvikView)
+                    {
+                        // Native type (e.g. GLSurfaceView) with no managed equivalent.
+                        // TryNativeMethod is always called on the UI thread (Start() is called from
+                        // the UI thread and never truly yields before running bytecode), so we can
+                        // access UI elements directly here.
+                        Debug.WriteLine("[DalvikCPU] setContentView(DalvikObject=" + dalvikView.TypeName + ") - creating native render surface.");
+                        var surface = new AndroidRenderSurface();
+                        surface.HorizontalAlignment = HorizontalAlignment.Stretch;
+                        surface.VerticalAlignment = VerticalAlignment.Stretch;
+                        hostPage.SetNativeRenderSurface(surface);
+                    }
+                    else if (arg0 != null)
+                    {
+                        // Try to cast to int for resource ID passed as object
+                        Debug.WriteLine("[DalvikCPU] setContentView(arg=" + arg0.GetType().Name + " value=" + arg0 + ")");
+                        int resId = ToInt(arg0);
+                        if (resId != 0)
+                            droidWindow.setContentView(resId);
+                    }
+                    else
+                    {
+                        Debug.WriteLine("[DalvikCPU] setContentView called with null argument, skipping.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[DalvikCPU] setContentView error: " + ex.Message);
+                }
                 return true;
             }
 
@@ -1156,6 +1208,7 @@ namespace DalvikUWPCSharp.Classes
                     args[i - 1] = regIdx < Registers.Length ? Registers[regIdx] : null;
                 }
 
+                Debug.WriteLine("[DalvikCPU] " + invokeOp.Instruction + " " + m.Class?.Name + "." + m.Name + " args=" + args.Length);
                 if (!TryNativeMethod(m, cl, args))
                     result = RunMethod(m, cl, args);
             }
@@ -1178,6 +1231,8 @@ namespace DalvikUWPCSharp.Classes
                     int regIdx = rangeOp.FirstArgument + 1 + i;
                     args[i] = regIdx < Registers.Length ? Registers[regIdx] : null;
                 }
+
+                Debug.WriteLine("[DalvikCPU] invoke-range " + m.Class?.Name + "." + m.Name + " args=" + count);
 
                 if (!TryNativeMethod(m, cl, args))
                     result = RunMethod(m, cl, args);

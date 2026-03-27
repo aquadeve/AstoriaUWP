@@ -1050,6 +1050,25 @@ namespace DalvikUWPCSharp.Reassembly.UI
                 return shapeView;
             }
 
+            // ── GLSurfaceView / SurfaceView ───────────────────────────────────────
+            // Native OpenGL games (e.g. Angry Birds) use GLSurfaceView for rendering.
+            // Map to AndroidRenderSurface so the game has a surface to draw on.
+            else if (xeName == "android.opengl.GLSurfaceView"
+                  || xeName == "GLSurfaceView"
+                  || xeName == "android.view.SurfaceView"
+                  || xeName == "SurfaceView"
+                  || xeName == "android.opengl.GLTextureView"
+                  || xeName == "android.view.TextureView"
+                  || xeName == "TextureView")
+            {
+                Debug.WriteLine("[Renderer] Creating AndroidRenderSurface for " + xeName);
+                var surface = new AndroidRenderSurface();
+                surface.HorizontalAlignment = HorizontalAlignment.Stretch;
+                surface.VerticalAlignment = VerticalAlignment.Stretch;
+                ApplyCommonAttributes(surface, xe);
+                return surface;
+            }
+
             // ── Unrecognised element placeholder ─────────────────────────────────
             else
             {
