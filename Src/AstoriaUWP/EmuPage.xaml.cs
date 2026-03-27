@@ -141,79 +141,69 @@ namespace DalvikUWPCSharp
         private async void Render()
         {
             StorageFile sf = null;
+            bool hasLayout = false;
             try
             {
                 var layout = await UIRenderer.CurrentApp.resFolder.GetFolderAsync("layout");
                 sf = await layout.GetFileAsync("activity_main.xml");
+                hasLayout = true;
+                Debug.WriteLine("[EmuPage] [Render] Found activity_main.xml in res/layout.");
             }
             catch(Exception ex)
             {
-                Debug.WriteLine("[EmuPage] [Render] activity_main.xml Layout Exception: " + ex.Message);
-                
-                // Fallback: try to load from Assets/SampleApps/ShapeViewDemo/activity_main.xml
+                Debug.WriteLine("[EmuPage] [Render] activity_main.xml not found: " + ex.Message);
+                Debug.WriteLine("[EmuPage] [Render] App has no XML layout - using native render surface.");
+            }
+
+            if (hasLayout && sf != null)
+            {
+                // App has an XML layout: inflate and display it
+                UIElement renderedLayout = null;
                 try
                 {
-                    string fallbackPath = "ms-appx:///Assets/SampleApps/ShapeViewDemo/activity_main.xml";
-                    sf = await StorageFile.GetFileFromApplicationUriAsync(new Uri(fallbackPath));
-                    Debug.WriteLine("[EmuPage] [Render] Loaded fallback activity_main.xml from Assets/SampleApps/ShapeViewDemo.");
+                    renderedLayout = await UIRenderer.RenderXmlFile(sf);
                 }
-                catch (Exception fallbackEx)
+                catch (Exception ex2)
                 {
-                    Debug.WriteLine("[EmuPage] [Render] Fallback activity_main.xml not found: " + fallbackEx.Message);
-                    ContentDialog msgDialog = new ContentDialog()
+                    Debug.WriteLine("[EmuPage] [Render] RenderXmlFile exception: " + ex2.Message);
+                }
+
+                if (renderedLayout != null)
+                {
+                    try
                     {
-                        Title = "Activity_main.xml not found!",
-                        Content = "Neither app resources nor fallback Assets/SampleApps/ShapeViewDemo/activity_main.xml could be loaded.\n" 
-                            + ex.Message + "\n" + fallbackEx.Message,
-                        PrimaryButtonText = "OK"
-                    };
-                    ContentDialogResult result = await msgDialog.ShowAsync();
-                    return;
+                        RenderTargetGrid.Children.Clear();
+                        RenderTargetGrid.Children.Add(renderedLayout);
+                        Debug.WriteLine("[EmuPage] [Render] XML layout added to RenderTargetGrid.");
+                    }
+                    catch (Exception ex3)
+                    {
+                        Debug.WriteLine("[EmuPage] [Render] RenderTargetGrid.Children.Add exception: " + ex3.Message);
+                    }
                 }
             }
-
-            UIElement child = null;
-            try
+            else
             {
-                child = await UIRenderer.RenderXmlFile(sf);
-            }
-            catch (Exception ex2)
-            {
-                Debug.WriteLine("EmuPage - Render - UIRenderer.RenderXmlFile Exception: " + ex2.Message);
-            }
-
-            UIElement uc = child;
-
-            var widthBinding = new Binding();
-            widthBinding.Converter = new EPDPConverter();
-            widthBinding.ElementName = "RenderTargetBox";
-            widthBinding.ConverterParameter = RenderTargetBox.Width;
-
-            var hBinding = new Binding();
-            hBinding.Converter = new EPDPConverter();
-            hBinding.ElementName = "RenderTargetBox";
-            hBinding.ConverterParameter = RenderTargetBox.Height;
-
-            try
-            {
-                RenderTargetBox.Child = (await UIRenderer.RenderXmlFile(sf));
-            }
-            catch (Exception ex3)
-            {
-                Debug.WriteLine("EmuPage - Render - RenderTargetBox.Child Exception: " + ex3.Message);
-            }
-
-            try
-            {
-                RenderTargetGrid.Children.Add(await UIRenderer.RenderXmlFile(sf));
-            }
-            catch (Exception ex4)
-            {
-                Debug.WriteLine("EmuPage - Render - RenderTargetGrid.Children.Add Exception: " + ex4.Message);
+                // No XML layout found - app likely renders via native OpenGL (e.g. Angry Birds).
+                // Only create the native surface if setContentView has not already populated the grid.
+                // All UI modifications happen on the UI thread (UWP serializes all UI updates),
+                // so Children.Count is safe to read here without additional synchronisation.
+                if (RenderTargetGrid.Children.Count == 0)
+                {
+                    Debug.WriteLine("[EmuPage] [Render] Creating full-screen AndroidRenderSurface for native rendering.");
+                    var nativeSurface = new DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface();
+                    nativeSurface.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    nativeSurface.VerticalAlignment = VerticalAlignment.Stretch;
+                    RenderTargetGrid.Children.Add(nativeSurface);
+                    Debug.WriteLine("[EmuPage] [Render] Native render surface ready.");
+                }
+                else
+                {
+                    Debug.WriteLine("[EmuPage] [Render] RenderTargetGrid already populated by setContentView, skipping native surface creation.");
+                }
             }
 
             SetTitleBarColor(attr.colorPrimaryDark);
-            cpu.Start();
             Windows.UI.ViewManagement.ApplicationView.GetForCurrentView();
         }
 
@@ -226,6 +216,17 @@ namespace DalvikUWPCSharp
             RenderTargetGrid.Children.Add(v);
 
         }//SetContentView end
+
+
+        // SetNativeRenderSurface - used by DalvikCPU when setContentView is called with
+        // a native GLSurfaceView (no managed equivalent). Sets a full-screen render surface.
+        // Must be called on the UI thread.
+        public void SetNativeRenderSurface(DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface surface)
+        {
+            Debug.WriteLine("[EmuPage] SetNativeRenderSurface called.");
+            RenderTargetGrid.Children.Clear();
+            RenderTargetGrid.Children.Add(surface);
+        }//SetNativeRenderSurface end
 
 
         // SetTitleBarColor 
@@ -350,7 +351,6 @@ namespace DalvikUWPCSharp
 
 
         // * EmuPage_Loaded *
-        //Currently only support content_main.xml since the dissassembler cant yet parse activity_main.xml
         private void EmuPage_Loaded(object sender, RoutedEventArgs e)
         {
             var appView = Windows.UI.ViewManagement.ApplicationView.GetForCurrentView();
@@ -362,23 +362,12 @@ namespace DalvikUWPCSharp
             catch (Exception ex1)
             {
                 Debug.WriteLine("[ex] EmuPage_Loaded problems: " + ex1.Message);
-                //Plan A
-                //var dialog = new MessageDialog($"RunningApp.metadata is null (broken object)  \n\n{ex1.Message}");
-                //dialog.ShowAsync();
-
-                //Plan B
                 Frame.Navigate(typeof(MainPage));
-
                 return;
             }
 
-
-            cpu = new DalvikCPU(RunningApp.dex, RunningApp.metadata.packageName, this);
-
-            cpu.Start();
-
+            // CPU was already created and started in OnNavigatedTo; do not recreate it here.
             SystemNavigationManager.GetForCurrentView().AppViewBackButtonVisibility = AppViewBackButtonVisibility.Visible;
-
             SystemNavigationManager.GetForCurrentView().BackRequested += EmuPage_BackRequested;
 
         }// EmuPage_Loaded end

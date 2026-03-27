@@ -206,6 +206,8 @@ namespace DalvikUWPCSharp.Classes
         {
             RegisterLogStubs(env);
             RegisterSystemStubs(env);
+            RegisterActivityStubs(env);
+            RegisterGLStubs(env);
         }
 
         private static void RegisterLogStubs(JniEnvironment env)
@@ -277,6 +279,121 @@ namespace DalvikUWPCSharp.Classes
                 (jniEnv, thisObj, args) =>
                 {
                     return JniValue.FromInt(28); // Android 9 (Pie)
+                });
+        }
+
+        private static void RegisterActivityStubs(JniEnvironment env)
+        {
+            // android.app.Activity.getWindowManager
+            env.RegisterNativeMethod("android.app.Activity", "getWindowManager", "()Landroid/view/WindowManager;",
+                (jniEnv, thisObj, args) => JniValue.FromObject(null));
+
+            // android.app.Activity.getWindow
+            env.RegisterNativeMethod("android.app.Activity", "getWindow", "()Landroid/view/Window;",
+                (jniEnv, thisObj, args) => JniValue.FromObject(null));
+
+            // android.app.Activity.finish - stub to allow games to signal exit
+            env.RegisterNativeMethod("android.app.Activity", "finish", "()V",
+                (jniEnv, thisObj, args) =>
+                {
+                    Debug.WriteLine("[Activity] finish() called");
+                    return JniValue.FromInt(0);
+                });
+
+            // android.app.Activity.runOnUiThread - stub (runs synchronously in our emulator)
+            env.RegisterNativeMethod("android.app.Activity", "runOnUiThread", "(Ljava/lang/Runnable;)V",
+                (jniEnv, thisObj, args) =>
+                {
+                    Debug.WriteLine("[Activity] runOnUiThread called (stub)");
+                    return JniValue.FromInt(0);
+                });
+
+            // android.content.Context.getSystemService
+            env.RegisterNativeMethod("android.content.Context", "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;",
+                (jniEnv, thisObj, args) =>
+                {
+                    string service = args.Length > 0 ? args[0].L as string ?? "" : "";
+                    Debug.WriteLine("[Context] getSystemService: " + service);
+                    return JniValue.FromObject(null);
+                });
+
+            // android.content.Context.getPackageName
+            env.RegisterNativeMethod("android.content.Context", "getPackageName", "()Ljava/lang/String;",
+                (jniEnv, thisObj, args) => JniValue.FromObject("com.emulated.app"));
+
+            // android.content.res.AssetManager stubs
+            env.RegisterNativeMethod("android.content.res.AssetManager", "open", "(Ljava/lang/String;)Ljava/io/InputStream;",
+                (jniEnv, thisObj, args) =>
+                {
+                    string assetName = args.Length > 0 ? args[0].L as string ?? "" : "";
+                    Debug.WriteLine("[AssetManager] open: " + assetName);
+                    return JniValue.FromObject(null);
+                });
+        }
+
+        private static void RegisterGLStubs(JniEnvironment env)
+        {
+            // android.opengl.GLSurfaceView.setRenderer
+            env.RegisterNativeMethod("android.opengl.GLSurfaceView", "setRenderer",
+                "(Landroid/opengl/GLSurfaceView$Renderer;)V",
+                (jniEnv, thisObj, args) =>
+                {
+                    Debug.WriteLine("[GLSurfaceView] setRenderer called - native renderer attached.");
+                    return JniValue.FromInt(0);
+                });
+
+            // android.opengl.GLSurfaceView.setEGLContextClientVersion
+            env.RegisterNativeMethod("android.opengl.GLSurfaceView", "setEGLContextClientVersion", "(I)V",
+                (jniEnv, thisObj, args) =>
+                {
+                    int version = args.Length > 0 ? args[0].I : 0;
+                    Debug.WriteLine("[GLSurfaceView] setEGLContextClientVersion: " + version);
+                    return JniValue.FromInt(0);
+                });
+
+            // android.opengl.GLSurfaceView.setPreserveEGLContextOnPause
+            env.RegisterNativeMethod("android.opengl.GLSurfaceView", "setPreserveEGLContextOnPause", "(Z)V",
+                (jniEnv, thisObj, args) =>
+                {
+                    Debug.WriteLine("[GLSurfaceView] setPreserveEGLContextOnPause: " + (args.Length > 0 ? args[0].Z.ToString() : "?"));
+                    return JniValue.FromInt(0);
+                });
+
+            // android.opengl.GLSurfaceView.requestRender
+            env.RegisterNativeMethod("android.opengl.GLSurfaceView", "requestRender", "()V",
+                (jniEnv, thisObj, args) =>
+                {
+                    Debug.WriteLine("[GLSurfaceView] requestRender called");
+                    return JniValue.FromInt(0);
+                });
+
+            // android.opengl.GLSurfaceView.onResume
+            env.RegisterNativeMethod("android.opengl.GLSurfaceView", "onResume", "()V",
+                (jniEnv, thisObj, args) =>
+                {
+                    Debug.WriteLine("[GLSurfaceView] onResume called");
+                    return JniValue.FromInt(0);
+                });
+
+            // android.opengl.GLSurfaceView.onPause
+            env.RegisterNativeMethod("android.opengl.GLSurfaceView", "onPause", "()V",
+                (jniEnv, thisObj, args) =>
+                {
+                    Debug.WriteLine("[GLSurfaceView] onPause called");
+                    return JniValue.FromInt(0);
+                });
+
+            // android.opengl.GLES20 stubs for basic GL calls
+            env.RegisterNativeMethod("android.opengl.GLES20", "glClear", "(I)V",
+                (jniEnv, thisObj, args) => JniValue.FromInt(0));
+            env.RegisterNativeMethod("android.opengl.GLES20", "glClearColor", "(FFFF)V",
+                (jniEnv, thisObj, args) => JniValue.FromInt(0));
+            env.RegisterNativeMethod("android.opengl.GLES20", "glViewport", "(IIII)V",
+                (jniEnv, thisObj, args) =>
+                {
+                    if (args.Length >= 4)
+                        Debug.WriteLine("[GLES20] glViewport(" + args[0].I + "," + args[1].I + "," + args[2].I + "," + args[3].I + ")");
+                    return JniValue.FromInt(0);
                 });
         }
     }
