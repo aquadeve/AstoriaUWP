@@ -350,46 +350,93 @@ namespace DalvikUWPCSharp.Disassembly.APKReader
         }//FindInDocument end
 
 
+        private string GetAttributeValue(XmlNode node, params string[] names)
+        {
+            if (node?.Attributes == null)
+                return null;
+
+            foreach (XmlAttribute attr in node.Attributes)
+            {
+                foreach (string name in names)
+                {
+                    if (attr.Name.Equals(name, StringComparison.OrdinalIgnoreCase)
+                        || attr.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrWhiteSpace(attr.Value))
+                            return attr.Value;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private bool IsLauncherIntentFilter(XmlNode node)
+        {
+            if (node == null || (!node.Name.Equals("intent-filter", StringComparison.OrdinalIgnoreCase)
+                && !node.LocalName.Equals("intent-filter", StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            bool hasMainAction = false;
+            bool hasLauncherCategory = false;
+
+            foreach (XmlNode filterChild in node.ChildNodes)
+            {
+                string nameVal = GetAttributeValue(filterChild, "name", "android:name");
+                string childName = filterChild.LocalName ?? filterChild.Name;
+
+                if (childName.Equals("action", StringComparison.OrdinalIgnoreCase)
+                    && nameVal == "android.intent.action.MAIN")
+                    hasMainAction = true;
+
+                if (childName.Equals("category", StringComparison.OrdinalIgnoreCase)
+                    && nameVal == "android.intent.category.LAUNCHER")
+                    hasLauncherCategory = true;
+            }
+
+            return hasMainAction && hasLauncherCategory;
+        }
+
+        private string FindLauncherComponent(XmlNodeList nodes, string preferredAttributeName = null)
+        {
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                XmlNode node = nodes.Item(i);
+                if (node?.NodeType != XmlNodeType.Element)
+                    continue;
+
+                foreach (XmlNode child in node.ChildNodes)
+                {
+                    if (!IsLauncherIntentFilter(child))
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(preferredAttributeName))
+                    {
+                        string targetActivity = GetAttributeValue(node, preferredAttributeName, "android:" + preferredAttributeName);
+                        if (!string.IsNullOrWhiteSpace(targetActivity))
+                            return targetActivity;
+                    }
+
+                    string activityName = GetAttributeValue(node, "name", "android:name");
+                    if (!string.IsNullOrWhiteSpace(activityName))
+                        return activityName;
+                }
+            }
+
+            return null;
+        }
+
         // FindLauncherActivity - finds the activity declared with android.intent.action.MAIN
         // and android.intent.category.LAUNCHER intent filter in AndroidManifest.xml.
         private String FindLauncherActivity(XmlDocument doc)
         {
             try
             {
-                XmlNodeList activities = doc.GetElementsByTagName("activity");
-                for (int i = 0; i < activities.Count; i++)
-                {
-                    XmlNode activity = activities.Item(i);
-                    if (activity.NodeType != XmlNodeType.Element) continue;
+                string launcherActivity = FindLauncherComponent(doc.GetElementsByTagName("activity"));
+                if (!string.IsNullOrWhiteSpace(launcherActivity))
+                    return launcherActivity;
 
-                    foreach (XmlNode child in activity.ChildNodes)
-                    {
-                        if (child.Name != "intent-filter") continue;
-
-                        bool hasMainAction = false;
-                        bool hasLauncherCategory = false;
-
-                        foreach (XmlNode filterChild in child.ChildNodes)
-                        {
-                            // Attribute name can appear as "name" or "android:name"
-                            XmlNode nameAttr = filterChild.Attributes?.GetNamedItem("name")
-                                           ?? filterChild.Attributes?.GetNamedItem("android:name");
-                            string nameVal = nameAttr?.Value ?? "";
-
-                            if (filterChild.Name == "action" && nameVal == "android.intent.action.MAIN")
-                                hasMainAction = true;
-                            if (filterChild.Name == "category" && nameVal == "android.intent.category.LAUNCHER")
-                                hasLauncherCategory = true;
-                        }
-
-                        if (hasMainAction && hasLauncherCategory)
-                        {
-                            XmlNode actNameAttr = activity.Attributes?.GetNamedItem("name")
-                                               ?? activity.Attributes?.GetNamedItem("android:name");
-                            return actNameAttr?.Value;
-                        }
-                    }
-                }
+                return FindLauncherComponent(doc.GetElementsByTagName("activity-alias"), "targetActivity");
             }
             catch (Exception ex)
             {
