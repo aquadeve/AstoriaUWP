@@ -34,6 +34,8 @@ namespace DalvikUWPCSharp.Disassembly.APKReader
         public String minSdkVersion;
         public String targetSdkVersion;
         public String packageName;
+        /// <summary>The fully-qualified or relative class name of the launcher Activity from AndroidManifest.</summary>
+        public String mainActivity;
         public List<String> Permissions;
         public List<String> iconFileName;
         public List<String> iconFileNameToGet;
