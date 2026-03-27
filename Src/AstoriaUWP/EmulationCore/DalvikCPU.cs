@@ -41,7 +41,7 @@ namespace DalvikUWPCSharp.Classes
         DroidApp da;
 
         private Context appContext;
-        private Window droidWindow;
+        private AndroidInteropLib.android.view.Window droidWindow;
 
         // JNI bridge for native method calls (apkenv-inspired)
         public JniEnvironment JniEnv { get; private set; }
@@ -1195,7 +1195,7 @@ namespace DalvikUWPCSharp.Classes
             return s.Replace("internal", "_internal");
         }
 
-        // Execute an invoke-family opcode
+        // party rockers in the house tonight!!!!
         private void ExecuteInvoke(InvokeOpCode invokeOp, Class cl)
         {
             try
@@ -1208,7 +1208,7 @@ namespace DalvikUWPCSharp.Classes
                     args[i - 1] = regIdx < Registers.Length ? Registers[regIdx] : null;
                 }
 
-                Debug.WriteLine("[DalvikCPU] " + invokeOp.Instruction + " " + m.Class?.Name + "." + m.Name + " args=" + args.Length);
+                Debug.WriteLine("[DalvikCPU] " + invokeOp.Instruction + " " + dex.GetTypeName(m.ClassIndex) + "." + m.Name + " args=" + args.Length);
                 if (!TryNativeMethod(m, cl, args))
                     result = RunMethod(m, cl, args);
             }
@@ -1218,7 +1218,6 @@ namespace DalvikUWPCSharp.Classes
             }
         }
 
-        // Execute an invoke-range opcode
         private void ExecuteInvokeRange(InvokeRangeOpCode rangeOp, Class cl)
         {
             try
@@ -1232,7 +1231,7 @@ namespace DalvikUWPCSharp.Classes
                     args[i] = regIdx < Registers.Length ? Registers[regIdx] : null;
                 }
 
-                Debug.WriteLine("[DalvikCPU] invoke-range " + m.Class?.Name + "." + m.Name + " args=" + count);
+                Debug.WriteLine("[DalvikCPU] invoke-range " + dex.GetTypeName(m.ClassIndex) + "." + m.Name + " args=" + count);
 
                 if (!TryNativeMethod(m, cl, args))
                     result = RunMethod(m, cl, args);
@@ -1249,7 +1248,7 @@ namespace DalvikUWPCSharp.Classes
             try
             {
                 var bop = (BinaryOpOpCode)op;
-                Registers[bop.Destination] = operation(Registers[bop.FirstSource], Registers[bop.SecondSource]);
+                Registers[bop.Destination] = operation(Registers[bop.First], Registers[bop.Second]);
             }
             catch (Exception ex)
             {

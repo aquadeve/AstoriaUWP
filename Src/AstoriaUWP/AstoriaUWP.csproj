@@ -195,8 +195,10 @@
     <Compile Include="DroidAppLoadingPopup.xaml.cs">
       <DependentUpon>DroidAppLoadingPopup.xaml</DependentUpon>
     </Compile>
+    <Compile Include="EmulationCore\AndroidProperties.cs" />
     <Compile Include="EmulationCore\DalvikCPU.cs" />
     <Compile Include="EmulationCore\DalvikRAM.cs" />
+    <Compile Include="EmulationCore\DynamicLinker.cs" />
     <Compile Include="EmulationCore\ElfLoader.cs" />
     <Compile Include="EmulationCore\JniBridge.cs" />
     <Compile Include="EmulationCore\XboxPlatform.cs" />

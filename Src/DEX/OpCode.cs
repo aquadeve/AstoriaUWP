@@ -1750,8 +1750,8 @@ namespace dex.net
 	/// </summary>
 	public abstract class BinaryOpOpCode : Register8OpCode
 	{
-		internal byte First;
-		internal byte Second;
+		public byte First;
+		public byte Second;
 
 		internal BinaryOpOpCode (BinaryReader reader, string name, Instructions insn) : base(reader, name, insn)
 		{
