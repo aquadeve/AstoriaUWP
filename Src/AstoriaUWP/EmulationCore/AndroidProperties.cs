@@ -2,6 +2,8 @@
 // Managed C# implementation of Android system properties.
 // Translated from referenceBridge/BridgeLib/android_init.cpp which sets up
 // Android runtime properties, environment variables, and ABI detection.
+//
+// Debug logging: Verbose property-set logging compiled only in DEBUG builds.
 
 using DalvikUWPCSharp.Classes;
 using System;
@@ -30,6 +32,22 @@ namespace DalvikUWPCSharp.Classes
         public string Get(string name, string defaultValue = "")
         {
             return _properties.TryGetValue(name, out string val) ? val : defaultValue;
+        }
+
+        /// <summary>Gets a system property as an integer.</summary>
+        public int GetInt(string name, int defaultValue = 0)
+        {
+            if (_properties.TryGetValue(name, out string val) && int.TryParse(val, out int result))
+                return result;
+            return defaultValue;
+        }
+
+        /// <summary>Gets a system property as a boolean ("1" / "true" = true).</summary>
+        public bool GetBool(string name, bool defaultValue = false)
+        {
+            if (_properties.TryGetValue(name, out string val))
+                return val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase);
+            return defaultValue;
         }
 
         /// <summary>Sets a system property value.</summary>
@@ -132,6 +150,16 @@ namespace DalvikUWPCSharp.Classes
 
             // ── Android app-process path (android_init.cpp) ───────────────
             Set("ro.zygote",          "zygote32");
+
+            // ── Additional properties commonly queried by games ───────────
+            Set("ro.build.version.min_supported_target_sdk", "17");
+            Set("ro.build.fingerprint",
+                "generic/generic_x86_64/generic_x86_64:9/PI/5124027:userdebug/release-keys");
+            Set("ro.build.characteristics", "default");
+            Set("gsm.version.ril-impl", "android emulator-ril 1.0");
+            Set("net.gprs.local-ip",    "10.0.2.15");
+            Set("net.dns1",             "10.0.2.3");
+            Set("wifi.interface",        "wlan0");
 
             Debug.WriteLine("[AndroidProperties] Initialised " + _properties.Count + " properties.");
         }
