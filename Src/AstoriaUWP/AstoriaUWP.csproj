@@ -203,6 +203,18 @@
     <Compile Include="EmulationCore\JniBridge.cs" />
     <Compile Include="EmulationCore\XboxPlatform.cs" />
     <Compile Include="EmulationCore\Util.cs" />
+    <!-- FLinux C# port: virtual memory, process, VFS, CPU interpreters, syscalls -->
+    <Compile Include="FLinux\Core\LinuxMemory.cs" />
+    <Compile Include="FLinux\Core\LinuxProcess.cs" />
+    <Compile Include="FLinux\Core\LinuxVfs.cs" />
+    <Compile Include="FLinux\Core\ElfBinary.cs" />
+    <Compile Include="FLinux\Cpu\ICpuInterpreter.cs" />
+    <Compile Include="FLinux\Cpu\ArmInterpreter.cs" />
+    <Compile Include="FLinux\Cpu\Arm64Interpreter.cs" />
+    <Compile Include="FLinux\Cpu\X64Interpreter.cs" />
+    <Compile Include="FLinux\Syscalls\SyscallNumbers.cs" />
+    <Compile Include="FLinux\Syscalls\SyscallDispatcher.cs" />
+    <Compile Include="FLinux\ElfExecutor.cs" />
     <Compile Include="EmuPage.xaml.cs">
       <DependentUpon>EmuPage.xaml</DependentUpon>
     </Compile>

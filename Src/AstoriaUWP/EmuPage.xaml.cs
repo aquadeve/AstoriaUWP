@@ -22,6 +22,7 @@ using AndroidXml;
 
 using DalvikUWPCSharp.Applet;
 using DalvikUWPCSharp.Classes;
+using DalvikUWPCSharp.FLinux.Cpu;
 using DalvikUWPCSharp.Reassembly;
 using DalvikUWPCSharp.Reassembly.UI;
 
@@ -37,6 +38,13 @@ namespace DalvikUWPCSharp
         private Renderer UIRenderer; // 
 
         private DalvikCPU cpu; //
+
+        /// <summary>
+        /// CPU execution mode selected by the user via the nav-bar ComboBox.
+        /// Defaults to ARM32 (most Android apps use armeabi-v7a).
+        /// Consumed by DalvikCPU.ScanNativeLibraries() when choosing the ElfExecutor mode.
+        /// </summary>
+        public ExecutionMode SelectedExecutionMode { get; private set; } = ExecutionMode.Arm32;
 
 
         // EmuPage
@@ -443,6 +451,39 @@ namespace DalvikUWPCSharp
                 Frame.Navigate(typeof(MainPage));
             }
         }//GoBack end
+
+
+        // ExecModeToggleBtn_Click – show/hide the execution-mode ComboBox.
+        private void ExecModeToggleBtn_Click(object sender, RoutedEventArgs e)
+        {
+            ExecModePanel.Visibility =
+                ExecModePanel.Visibility == Visibility.Collapsed
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+        }//ExecModeToggleBtn_Click end
+
+
+        // ExecModeCombo_SelectionChanged – update SelectedExecutionMode and,
+        // if a NativeExecutor already exists, change its mode on the fly.
+        private void ExecModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ExecModeCombo.SelectedItem is ComboBoxItem item)
+            {
+                string tag = item.Tag as string ?? "Arm32";
+                ExecutionMode mode;
+                switch (tag)
+                {
+                    case "Arm64": mode = ExecutionMode.Arm64; break;
+                    case "X64":   mode = ExecutionMode.X64;   break;
+                    default:      mode = ExecutionMode.Arm32; break;
+                }
+                SelectedExecutionMode = mode;
+                Debug.WriteLine($"[EmuPage] Execution mode changed to: {mode}");
+
+                // If a NativeExecutor is already running, apply the new mode.
+                cpu?.NativeExecutor?.SetMode(mode);
+            }
+        }//ExecModeCombo_SelectionChanged end
 
     }//EmuPage class end
 

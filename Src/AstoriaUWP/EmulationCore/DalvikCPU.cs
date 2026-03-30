@@ -1,11 +1,15 @@
 // DalvikCPU - PC-based Dalvik bytecode interpreter for AstoriaUWP
 // Implements concepts from referenceBridge (android_init, linker, JNI bridge stubs)
 // into a functional managed C# Dalvik VM.
+// Native .so execution is now handled by ElfExecutor (FLinux C# port),
+// which provides ARM32 / ARM64 / x64 software CPU interpreters.
 
 using AndroidInteropLib;
 using AndroidInteropLib.android.content;
 using AndroidInteropLib.android.view;
 using DalvikUWPCSharp.Applet;
+using DalvikUWPCSharp.FLinux;
+using DalvikUWPCSharp.FLinux.Cpu;
 using DalvikUWPCSharp.Reassembly;
 using DalvikUWPCSharp.Reassembly.UI;
 using dex.net;
@@ -54,6 +58,10 @@ namespace DalvikUWPCSharp.Classes
 
         // ELF loader for parsing native .so libraries
         private Dictionary<string, ElfLoader> loadedLibraries = new Dictionary<string, ElfLoader>();
+
+        // FLinux ELF executor – handles actual ELF binary execution with CPU emulation.
+        // Execution mode (ARM32 / ARM64 / x64) is set from the UI selection in EmuPage.
+        public ElfExecutor NativeExecutor { get; private set; }
 
         // Instance field storage: object -> (fieldName -> value)
         private Dictionary<int, Dictionary<string, object>> instanceFields =
@@ -1464,31 +1472,53 @@ namespace DalvikUWPCSharp.Classes
             fields[fieldName] = value;
         }
 
-        // ── Native library scanning (apkenv-inspired) ────────────────────
+        // ── Native library scanning (FLinux ElfExecutor + apkenv-inspired) ────
         private Task ScanNativeLibraries()
         {
             if (da.localAppRoot == null)
                 return Task.CompletedTask;
 
+            // Determine ABI directory and execution mode.
             string abiName = XboxPlatform.GetAndroidAbiName();
             string libPath = Path.Combine(da.localAppRoot.Path, "lib", abiName);
+
+            // Determine the best execution mode based on what ABI directories exist.
+            ExecutionMode execMode = hostPage.SelectedExecutionMode;
 
             try
             {
                 if (!Directory.Exists(libPath))
                 {
-                    string[] fallbacks = { "armeabi-v7a", "armeabi", "x86", "x86_64", "arm64-v8a" };
-                    foreach (string fallback in fallbacks)
+                    // Try to find a suitable ABI directory and auto-set execution mode.
+                    var abiCandidates = new[]
+                    {
+                        ("arm64-v8a",  ExecutionMode.Arm64),
+                        ("armeabi-v7a",ExecutionMode.Arm32),
+                        ("armeabi",    ExecutionMode.Arm32),
+                        ("x86_64",     ExecutionMode.X64),
+                        ("x86",        ExecutionMode.X64),
+                    };
+                    foreach (var (fallback, mode) in abiCandidates)
                     {
                         string altPath = Path.Combine(da.localAppRoot.Path, "lib", fallback);
                         if (Directory.Exists(altPath))
                         {
                             libPath = altPath;
+                            // Only auto-switch if the user left the default (ARM32).
+                            if (execMode == ExecutionMode.Arm32 && mode != ExecutionMode.Arm32)
+                            {
+                                execMode = mode;
+                                Debug.WriteLine($"[DalvikCPU] Auto-selected execution mode: {mode} (ABI: {fallback})");
+                            }
                             Debug.WriteLine("[DalvikCPU] Using fallback ABI: " + fallback);
                             break;
                         }
                     }
                 }
+
+                // Create the FLinux ElfExecutor for this execution mode.
+                NativeExecutor = new ElfExecutor(execMode, da.localAppRoot);
+                Debug.WriteLine($"[DalvikCPU] ElfExecutor created, mode={execMode}");
 
                 if (Directory.Exists(libPath))
                 {
@@ -1496,11 +1526,13 @@ namespace DalvikUWPCSharp.Classes
                     {
                         try
                         {
-                            var loader = new ElfLoader();
                             byte[] soData = File.ReadAllBytes(soFile);
-                            if (loader.Load(soData))
+                            string libName = Path.GetFileName(soFile);
+
+                            // Use ElfExecutor.LoadLibrary to parse + register JNI exports.
+                            var loader = NativeExecutor.LoadLibrary(soData, libName, JniEnv);
+                            if (loader != null)
                             {
-                                string libName = Path.GetFileName(soFile);
                                 loadedLibraries[libName] = loader;
                                 Linker.RegisterLoadedLibrary(libName, loader);
 
