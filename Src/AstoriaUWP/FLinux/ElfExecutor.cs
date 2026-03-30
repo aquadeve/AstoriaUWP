@@ -31,6 +31,13 @@ namespace DalvikUWPCSharp.FLinux
     /// </summary>
     public class ElfExecutor
     {
+        private struct ParsedJniName
+        {
+            public string ClassName;
+            public string MethodName;
+            public string Signature;
+        }
+
         // ── Configuration ─────────────────────────────────────────────────────
 
         /// <summary>Architecture / execution mode selected by the user.</summary>
@@ -213,7 +220,10 @@ namespace DalvikUWPCSharp.FLinux
                 var parsed = ParseJniName(jniFunc);
                 if (parsed != null)
                 {
-                    var (cls, method, sig) = parsed.Value;
+                    var parsedValue = parsed.Value;
+                    string cls = parsedValue.ClassName;
+                    string method = parsedValue.MethodName;
+                    string sig = parsedValue.Signature;
                     string capturedFunc = jniFunc; // capture for lambda
                     // Register a stub that logs the call and returns null.
                     // A full implementation would: map ELF segments into LinuxMemory,
@@ -300,7 +310,7 @@ namespace DalvikUWPCSharp.FLinux
         /// Parse a JNI function name like "Java_com_example_Foo_method__sig"
         /// into (className, methodName, signature).
         /// </summary>
-        private static (string cls, string method, string sig)? ParseJniName(string name)
+        private static ParsedJniName? ParseJniName(string name)
         {
             if (!name.StartsWith("Java_")) return null;
             // Strip "Java_" prefix.
@@ -313,7 +323,12 @@ namespace DalvikUWPCSharp.FLinux
             if (sep <= 0) return null;
             string method = rest.Substring(sep + 1).Replace("_1", "_");
             string cls    = rest.Substring(0, sep).Replace('_', '/').Replace("1/", "_");
-            return (cls, method, "");
+            return new ParsedJniName
+            {
+                ClassName = cls,
+                MethodName = method,
+                Signature = string.Empty
+            };
         }
     }
 }

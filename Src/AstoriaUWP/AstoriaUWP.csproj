@@ -30,6 +30,10 @@
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(PackageCertificateKeyFile)' != '' and !Exists('$(MSBuildProjectDirectory)\\$(PackageCertificateKeyFile)')">
+    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+    <GenerateAppxPackageOnBuild>False</GenerateAppxPackageOnBuild>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
     <DebugSymbols>true</DebugSymbols>
     <OutputPath>bin\x86\Debug\</OutputPath>

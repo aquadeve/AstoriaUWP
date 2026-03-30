@@ -34,6 +34,13 @@ namespace DalvikUWPCSharp.FLinux.Cpu
     /// </summary>
     public class X64Interpreter : ICpuInterpreter
     {
+        private struct ModRmDecodeResult
+        {
+            public int Reg;
+            public int Rm;
+            public long Disp;
+        }
+
         // ── Register file ─────────────────────────────────────────────────────
         // Index mapping (matches AMD64 REG field):
         //  0=RAX 1=RCX 2=RDX 3=RBX 4=RSP 5=RBP 6=RSI 7=RDI
@@ -230,7 +237,10 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                     // MOVZX / MOVSX
                     if (op2 == 0xB6 || op2 == 0xBE || op2 == 0xB7 || op2 == 0xBF)
                     {
-                        (int rd, int rm, long disp) = DecodeModRM(rexR, rexB, rexX);
+                        var modRm = DecodeModRM(rexR, rexB, rexX);
+                        int rd = modRm.Reg;
+                        int rm = modRm.Rm;
+                        long disp = modRm.Disp;
                         // 0xB6/0xBE: source is byte (8-bit); 0xB7/0xBF: source is word (16-bit).
                         int srcSz = (op2 == 0xB6 || op2 == 0xBE) ? 1 : 2;
                         ulong val = ReadRmOrMem(rm, disp, srcSz);
@@ -249,7 +259,10 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                 {
                     bool isStore = (op & 2) == 0;
                     int  sz      = (op & 1) == 0 ? 1 : opsz;
-                    (int rd, int rm, long disp) = DecodeModRM(rexR, rexB, rexX);
+                    var modRm = DecodeModRM(rexR, rexB, rexX);
+                    int rd = modRm.Reg;
+                    int rm = modRm.Rm;
+                    long disp = modRm.Disp;
                     if (isStore)
                         WriteMemOrRm(rm, disp, ReadReg(rd, sz), sz);
                     else
@@ -264,7 +277,9 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                 case 0xC6: case 0xC7:
                 {
                     int sz = (op == 0xC6) ? 1 : opsz;
-                    (int _u, int rm, long disp) = DecodeModRM(false, rexB, rexX);
+                    var modRm = DecodeModRM(false, rexB, rexX);
+                    int rm = modRm.Rm;
+                    long disp = modRm.Disp;
                     ulong imm = rexW ? Fetch32() : (op == 0xC6 ? Fetch() : Fetch32());
                     WriteMemOrRm(rm, disp, imm, sz);
                     return true;
@@ -289,7 +304,10 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                 case 0x84: case 0x85:
                 {
                     int sz = (op == 0x84) ? 1 : opsz;
-                    (int rd, int rm, long disp) = DecodeModRM(rexR, rexB, rexX);
+                    var modRm = DecodeModRM(rexR, rexB, rexX);
+                    int rd = modRm.Reg;
+                    int rm = modRm.Rm;
+                    long disp = modRm.Disp;
                     ulong a = ReadReg(rd, sz), b = ReadRmOrMem(rm, disp, sz);
                     SetLogicFlags(a & b, rexW ? 8 : sz);
                     return true;
@@ -299,7 +317,10 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                 case 0x86: case 0x87:
                 {
                     int sz = (op == 0x86) ? 1 : opsz;
-                    (int rd, int rm, long disp) = DecodeModRM(rexR, rexB, rexX);
+                    var modRm = DecodeModRM(rexR, rexB, rexX);
+                    int rd = modRm.Reg;
+                    int rm = modRm.Rm;
+                    long disp = modRm.Disp;
                     ulong a = ReadReg(rd, sz), b = ReadRmOrMem(rm, disp, sz);
                     WriteReg(rd, b, rexW);
                     WriteMemOrRm(rm, disp, a, sz);
@@ -309,7 +330,10 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                 // ── LEA ──────────────────────────────────────────────────────
                 case 0x8D:
                 {
-                    (int rd, int rm, long disp) = DecodeModRM(rexR, rexB, rexX);
+                    var modRm = DecodeModRM(rexR, rexB, rexX);
+                    int rd = modRm.Reg;
+                    int rm = modRm.Rm;
+                    long disp = modRm.Disp;
                     ulong ea = CalcEA(rm, disp);
                     WriteReg(rd, ea, rexW);
                     return true;
@@ -333,7 +357,9 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                     byte ext = _memory.ReadByte(_rip); // peek at /digit
                     int digit = (ext >> 3) & 7;
                     int sz = (op == 0xFE) ? 1 : opsz;
-                    (int _u, int rm, long disp) = DecodeModRM(false, rexB, rexX);
+                    var modRm = DecodeModRM(false, rexB, rexX);
+                    int rm = modRm.Rm;
+                    long disp = modRm.Disp;
                     ulong v = ReadRmOrMem(rm, disp, sz);
                     if (digit == 0) { ulong r = Add64(v, 1, sz, updateCF: false); WriteMemOrRm(rm, disp, r, sz); }      // INC
                     else if (digit == 1) { ulong r = Sub64(v, 1, sz, updateCF: false); WriteMemOrRm(rm, disp, r, sz); } // DEC
@@ -372,7 +398,10 @@ namespace DalvikUWPCSharp.FLinux.Cpu
             else
             {
                 sz = (op & 1) == 0 ? 1 : opsz;
-                (int rd, int rm, long d) = DecodeModRM(rexR, rexB, rexX);
+                var modRm = DecodeModRM(rexR, rexB, rexX);
+                int rd = modRm.Reg;
+                int rm = modRm.Rm;
+                long d = modRm.Disp;
                 disp = d;
                 if (dir)  { a = ReadReg(rd, sz); b = ReadRmOrMem(rm, disp, sz); dst = rd; }
                 else      { a = ReadRmOrMem(rm, disp, sz); b = ReadReg(rd, sz); dst = ~rm; }
@@ -400,8 +429,10 @@ namespace DalvikUWPCSharp.FLinux.Cpu
         private bool ExecuteGroup1(byte op, bool rexW, bool rexR, bool rexB, bool rexX, int opsz)
         {
             int sz = (op == 0x80) ? 1 : opsz;
-            (int _u, int rm, long disp) = DecodeModRM(false, rexB, rexX);
-            int digit = (_u < 0) ? (~_u >> 3) & 7 : (_u >> 3) & 7;
+            var modRm = DecodeModRM(false, rexB, rexX);
+            int rm = modRm.Rm;
+            long disp = modRm.Disp;
+            int digit = modRm.Reg & 7;
             ulong imm;
             if (op == 0x83) { sbyte s8 = (sbyte)Fetch(); imm = (ulong)(long)s8; }
             else if (op == 0x80) { imm = Fetch(); }
@@ -478,7 +509,7 @@ namespace DalvikUWPCSharp.FLinux.Cpu
 
         // ── ModRM / SIB decode ────────────────────────────────────────────────
 
-        private (int reg, int rm, long disp) DecodeModRM(bool rexR, bool rexB, bool rexX)
+        private ModRmDecodeResult DecodeModRM(bool rexR, bool rexB, bool rexX)
         {
             byte modrm = Fetch();
             int mod = modrm >> 6;
@@ -488,7 +519,7 @@ namespace DalvikUWPCSharp.FLinux.Cpu
             long disp = 0;
 
             if (mod == 3) // register-direct
-                return (reg, rm, 0);
+                return new ModRmDecodeResult { Reg = reg, Rm = rm, Disp = 0 };
 
             // SIB byte?
             bool hasSib = (modrm & 7) == 4;
@@ -508,7 +539,7 @@ namespace DalvikUWPCSharp.FLinux.Cpu
             if (hasSib)
                 rm = -(sib_base * 1000 + sib_index * 10 + sib_scale + 1); // encode SIB
 
-            return (reg, rm, disp);
+            return new ModRmDecodeResult { Reg = reg, Rm = rm, Disp = disp };
         }
 
         private ulong CalcEA(int rm, long disp)

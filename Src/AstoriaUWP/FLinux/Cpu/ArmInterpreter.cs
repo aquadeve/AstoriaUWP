@@ -461,7 +461,7 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                 int off11 = insn & 0x7FF;
                 if (op == 0x1E) // first halfword: set LR
                 {
-                    int imm = ((off11 << 12) | 0xFFFFF800); // sign-extend 11 bits
+                    int imm = unchecked((int)((uint)(off11 << 12) | 0xFFFFF800u)); // sign-extend 11 bits
                     LR_ref = (uint)(PC_ref + imm);
                 }
                 else // second halfword: branch

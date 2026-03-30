@@ -76,6 +76,13 @@ namespace DalvikUWPCSharp.FLinux.Core
         public LoadedElf Interpreter { get; set; }
     }
 
+    internal struct RawElfHeaderInfo
+    {
+        public ElfType Type;
+        public ushort PhdrNum;
+        public ushort PhdrEntSize;
+    }
+
     /// <summary>
     /// Loads an ELF binary into a <see cref="LinuxMemory"/> virtual address space.
     /// Mirrors FLinux exec.c:load_elf() plus the run() stack-setup helper.
@@ -352,7 +359,7 @@ namespace DalvikUWPCSharp.FLinux.Core
         /// Read just the e_type, e_phentsize, e_phnum fields from raw ELF data.
         /// ElfLoader doesn't expose these publicly, so we re-read them here.
         /// </summary>
-        private static (ElfType Type, ushort PhdrNum, ushort PhdrEntSize)? ParseRawHeader(byte[] data)
+        private static RawElfHeaderInfo? ParseRawHeader(byte[] data)
         {
             if (data == null || data.Length < 52) return null;
             bool is64 = data[4] == 2;
@@ -371,7 +378,12 @@ namespace DalvikUWPCSharp.FLinux.Core
                     r.ReadUInt16(); // e_ehsize
                     ushort phEntSize = r.ReadUInt16();
                     ushort phNum     = r.ReadUInt16();
-                    return (type, phNum, phEntSize);
+                    return new RawElfHeaderInfo
+                    {
+                        Type = type,
+                        PhdrNum = phNum,
+                        PhdrEntSize = phEntSize
+                    };
                 }
             }
             catch { return null; }

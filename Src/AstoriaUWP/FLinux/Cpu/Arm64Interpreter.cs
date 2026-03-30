@@ -462,7 +462,7 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                     res = sf ? (isMSub ? rav - rnv * rmv : rav + rnv * rmv)
                                : (ulong)((uint)rav + (uint)((isMSub ? 0u - (uint)rnv * (uint)rmv : (uint)rnv * (uint)rmv)));
                 else if (op54 == 2) // SMULH – upper 64 bits of signed 64×64 product
-                    res = (ulong)((Int128)(long)rnv * (long)rmv).Upper;
+                    res = (ulong)Int128.Multiply((long)rnv, (long)rmv).Upper;
                 else // UMULH – upper 64 bits of unsigned 64×64 product
                     res = ((UInt128)rnv * rmv).Upper;
                 Xw(rd, sf ? res : res & 0xFFFFFFFF);
@@ -547,7 +547,7 @@ namespace DalvikUWPCSharp.FLinux.Cpu
             {
                 _n = is64 ? (r >> 63) != 0 : (r >> 31) != 0;
                 _z = (is64 ? r : r & 0xFFFFFFFF) == 0;
-                _c = is64 ? res.Hi != 0 : res > 0xFFFFFFFF;
+                _c = is64 ? res.Hi != 0 : res.Exceeds(0xFFFFFFFFUL);
                 _v = is64 ? (~(a ^ b) & (a ^ r) & (1UL << 63)) != 0
                            : (~(a ^ b) & (a ^ r) & (1UL << 31)) != 0;
             }
@@ -651,9 +651,9 @@ namespace DalvikUWPCSharp.FLinux.Cpu
         public UInt128(ulong lo, ulong hi) { Lo = lo; Hi = hi; }
         public static UInt128 operator +(UInt128 a, ulong b) { ulong lo = a.Lo + b; return new UInt128(lo, a.Hi + (lo < a.Lo ? 1UL : 0UL)); }
         public static UInt128 operator +(UInt128 a, UInt128 b) { ulong lo = a.Lo + b.Lo; return new UInt128(lo, a.Hi + b.Hi + (lo < a.Lo ? 1UL : 0UL)); }
-        public static bool operator >(UInt128 a, ulong b) => a.Hi > 0 || a.Lo > b;
         public static explicit operator ulong(UInt128 a) => a.Lo;
         public static implicit operator UInt128(ulong v) => new UInt128(v, 0);
+        public bool Exceeds(ulong value) => Hi != 0 || Lo > value;
         public static UInt128 operator *(UInt128 a, ulong b)
         {
             ulong aHi = a.Hi, aLo = a.Lo;
@@ -673,7 +673,7 @@ namespace DalvikUWPCSharp.FLinux.Cpu
         public Int128(long hi, ulong lo) { _hi = hi; _lo = lo; }
         /// <summary>Upper 64 bits (the high half of the 128-bit product).</summary>
         public long Upper => _hi;
-        public static Int128 operator *(long a, long b)
+        public static Int128 Multiply(long a, long b)
         {
             // 64×64 → 128-bit signed multiply.
             bool neg = (a < 0) ^ (b < 0);

@@ -1492,14 +1492,16 @@ namespace DalvikUWPCSharp.Classes
                     // Try to find a suitable ABI directory and auto-set execution mode.
                     var abiCandidates = new[]
                     {
-                        ("arm64-v8a",  ExecutionMode.Arm64),
-                        ("armeabi-v7a",ExecutionMode.Arm32),
-                        ("armeabi",    ExecutionMode.Arm32),
-                        ("x86_64",     ExecutionMode.X64),
-                        ("x86",        ExecutionMode.X64),
+                        new KeyValuePair<string, ExecutionMode>("arm64-v8a", ExecutionMode.Arm64),
+                        new KeyValuePair<string, ExecutionMode>("armeabi-v7a", ExecutionMode.Arm32),
+                        new KeyValuePair<string, ExecutionMode>("armeabi", ExecutionMode.Arm32),
+                        new KeyValuePair<string, ExecutionMode>("x86_64", ExecutionMode.X64),
+                        new KeyValuePair<string, ExecutionMode>("x86", ExecutionMode.X64),
                     };
-                    foreach (var (fallback, mode) in abiCandidates)
+                    foreach (var abiCandidate in abiCandidates)
                     {
+                        string fallback = abiCandidate.Key;
+                        ExecutionMode mode = abiCandidate.Value;
                         string altPath = Path.Combine(da.localAppRoot.Path, "lib", fallback);
                         if (Directory.Exists(altPath))
                         {
