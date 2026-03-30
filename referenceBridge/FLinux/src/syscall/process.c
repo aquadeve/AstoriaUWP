@@ -462,12 +462,15 @@ DEFINE_SYSCALL(wait4, pid_t, pid, int *, status, int, options, struct rusage *, 
 __declspec(noreturn) void process_exit(int exit_code, int exit_signal)
 {
 	/* TODO: Gracefully shutdown subsystems, but take care of race conditions */
-	process_lock_shared();
-	pid_t pid = process->pid;
-	process_shared->processes[pid].exit_code = exit_code;
-	process_shared->processes[pid].exit_signal = exit_signal;
-	process_shared->processes[pid].status = PROCESS_ZOMBIE;
-	/* Let Windows release process lock for us */
+  if (process_shared)
+	{
+		process_lock_shared();
+		pid_t pid = process->pid;
+		process_shared->processes[pid].exit_code = exit_code;
+		process_shared->processes[pid].exit_signal = exit_signal;
+		process_shared->processes[pid].status = PROCESS_ZOMBIE;
+		/* Let Windows release process lock for us */
+	}
 	ExitProcess(exit_code);
 }
 

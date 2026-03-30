@@ -543,7 +543,13 @@ static DWORD WINAPI fork_thread_callback(void *data)
 		current_thread->clear_tid = NULL;
 //	dbt_update_tls(info->gs);
 	struct syscall_context context = info->context;
+#if defined(_M_X64)
+	context.rax = 0;
+#elif defined(_M_IX86)
 	context.eax = 0;
+#elif defined(_M_ARM)
+	context.r0 = 0;
+#endif
 	VirtualFree(info, 0, MEM_RELEASE);
 //	dbt_restore_fork_context(&context);
 	return 0;

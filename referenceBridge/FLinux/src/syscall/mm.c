@@ -1120,23 +1120,23 @@ int mm_handle_page_fault(void *addr, bool is_write)
 int mm_write_process_memory(HANDLE process, LPVOID lpBaseAddress, LPCVOID lpBuffer, SIZE_T nSize)
 {
 	DWORD oldProtect;
-	if (!VirtualProtectEx(process, mm, sizeof(struct mm_data), PAGE_READWRITE, &oldProtect))
+	if (!VirtualProtectEx(process, lpBaseAddress, nSize, PAGE_READWRITE, &oldProtect))
 	{
-		return -1;
+		return 0;
 	}
 
-	if (!WriteProcessMemory(process, mm, &mm, sizeof(struct mm_data), NULL))
+	if (!WriteProcessMemory(process, lpBaseAddress, lpBuffer, nSize, NULL))
 	{
-		return -2;
+		return 0;
 	}
 
 
-	if (oldProtect != PAGE_READWRITE && !VirtualProtectEx(process, mm, sizeof(struct mm_data), oldProtect, &oldProtect))
+	if (oldProtect != PAGE_READWRITE && !VirtualProtectEx(process, lpBaseAddress, nSize, oldProtect, &oldProtect))
 	{
-		return -3;
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 int mm_fork(HANDLE process)
@@ -1154,7 +1154,7 @@ int mm_fork(HANDLE process)
 
 	/* Copy section handle tables */
 	HANDLE *forked_section_handle = VirtualAllocEx(process, NULL, BLOCK_COUNT * sizeof(HANDLE), MEM_RESERVE | MEM_TOP_DOWN, PAGE_READWRITE);
-	if(! mm_write_process_memory(process, &mm_section_handle, &forked_section_handle, sizeof(HANDLE *), NULL))
+	if(! mm_write_process_memory(process, &mm_section_handle, &forked_section_handle, sizeof(HANDLE *)))
 	{
 		log_error("mm_fork(): Copy section handle master table failed, status: %x", GetLastError());
 		return 0;
@@ -1168,7 +1168,7 @@ int mm_fork(HANDLE process)
 				log_error("mm_fork(): Allocate section table 0x%p failed, error code: %d", i, GetLastError());
 				return 0;
 			}
-			if (!mm_write_process_memory(process, &forked_section_handle[j], &mm_section_handle[j], BLOCK_SIZE, NULL))
+			if (!mm_write_process_memory(process, &forked_section_handle[j], &mm_section_handle[j], BLOCK_SIZE))
 			{
 				log_error("mm_fork(): Write section table 0x%p failed, status: %x", GetLastError());
 				return 0;

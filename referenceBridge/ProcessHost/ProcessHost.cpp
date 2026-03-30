@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <string>
+#include <vector>
 #include "android_init.h"
 extern "C"
 {
@@ -77,6 +78,12 @@ int start()
 
 		DebugLog("module entry point 0x%x", _module_entry_point);
 
+		if (_module_entry_point == NULL)
+		{
+			DebugLog("start: _module_entry_point_ not found in patchoat.dll\n");
+			return -1;
+		}
+
 		intstack15 stack_params;
 
 		int i = 0;
@@ -93,11 +100,21 @@ int start()
 
 		stack_params.pos[i++] = 0;
 
-		_module_entry_point(
+		__try
+		{
+			_module_entry_point(
 #ifdef _M_ARM
-			0, 0, 0, 0, //skip register params on ARM, we need copy all params to stack
+				0, 0, 0, 0, //skip register params on ARM (r0-r3), copy all params to stack
+#elif defined(_M_AMD64)
+				0, 0, 0, 0, //skip register params on x64 (RCX, RDX, R8, R9), copy all params to stack
 #endif
-			stack_params);
+				stack_params);
+		}
+		__except (filterException(GetExceptionCode(), GetExceptionInformation()))
+		{
+			DebugLog("start: exception in module entry point\n");
+			return -1;
+		}
 
 		return 0;
 
@@ -107,34 +124,80 @@ int start()
 
 }
 
+// UWP-compatible fork implementation.
+// RtlCloneUserProcess is not permitted inside the UWP AppContainer security sandbox.
+// Instead we spawn a fresh child instance of this process via CreateProcess, forwarding
+// the current --root and --params arguments plus a --child marker.
+// Returns:
+//   > 0 (child PID)  in the parent process
+//   0               if this process is already the child (isChildProcess == true)
+//   -1              on error
+static int fork_uwp(bool isChildProcess, const std::wstring& wroot, int argc_val)
+{
+	if (isChildProcess)
+	{
+		// We are already the child; no need to spawn again.
+		return 0;
+	}
+
+	WCHAR szExePath[MAX_PATH] = {};
+	if (!GetModuleFileNameW(NULL, szExePath, MAX_PATH))
+	{
+		DebugLog("fork_uwp: GetModuleFileNameW failed (error 0x%x)\n", GetLastError());
+		return -1;
+	}
+
+	// Build command line: forward current root/params args and append --child.
+	// Use a vector<wchar_t> so that CreateProcessW gets the required writable buffer.
+	std::wstring cmdLineStr = L"\"";
+	cmdLineStr += szExePath;
+	cmdLineStr += L"\"";
+	if (!wroot.empty())
+	{
+		cmdLineStr += L" --root=";
+		cmdLineStr += wroot;
+	}
+	if (argc_val > 0)
+	{
+		cmdLineStr += L" --params=";
+		cmdLineStr += std::to_wstring(argc_val);
+	}
+	cmdLineStr += L" --child";
+
+	std::vector<wchar_t> cmdLineBuf(cmdLineStr.begin(), cmdLineStr.end());
+	cmdLineBuf.push_back(L'\0');
+
+	STARTUPINFOW si = {};
+	si.cb = sizeof(si);
+	PROCESS_INFORMATION pi = {};
+
+	BOOL ok = CreateProcessW(NULL, cmdLineBuf.data(), NULL, NULL,
+	                          FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+	if (!ok)
+	{
+		DebugLog("fork_uwp: CreateProcessW failed (error 0x%x)\n", GetLastError());
+		return -1;
+	}
+
+	// Resume the child just like the RTL_CLONE_PARENT path used to do.
+	ResumeThread(pi.hThread);
+	DWORD childPid = pi.dwProcessId;
+	CloseHandle(pi.hThread);
+	CloseHandle(pi.hProcess);
+
+	DebugLog("fork_uwp: spawned child PID %u\n", (unsigned)childPid);
+	return static_cast<int>(childPid);
+}
+
 int main()
 {
-	//__debugbreak();
-	/*HMODULE mod;
-	RTL_USER_PROCESS_INFORMATION process_info;
-	NTSTATUS result;
-
-	result = RtlCloneUserProcess(RTL_CLONE_PROCESS_FLAGS_CREATE_SUSPENDED | RTL_CLONE_PROCESS_FLAGS_INHERIT_HANDLES, NULL, NULL, NULL, &process_info);
-
-
-	if (result == RTL_CLONE_PARENT)
-	{
-		DebugLog("parent\n");
-		ResumeThread(process_info.Thread);
-	}
-	else if(result == RTL_CLONE_CHILD)
-	{
-		DebugLog("child\n");
-	}
-	HANDLE me = GetCurrentProcess();*/
-
-
 	LPCSTR cmdLine = GetCommandLineA();
 	DebugLog("command line: %s\n", cmdLine);
 
 
 	std::wstring wroot;
 	int argc = 0;
+	bool isChild = false;
 
 	int i = 0;
 	int bufferSize = strlen(cmdLine) + 1;
@@ -144,7 +207,7 @@ int main()
 
 	while (i < bufferSize && buffer[i] == '-' && buffer[i + 1] == '-')
 	{
-		i += 2; //skip -- 
+		i += 2; //skip --
 
 		if (!strncmp(buffer + i, "root=", 5))
 		{
@@ -160,27 +223,48 @@ int main()
 		{
 			i += 7;
 			argc = atoi(buffer + i);
+			while (buffer[i] != ' ' && buffer[i] != 0)
+				i++;
+			if (buffer[i] == ' ') i++;
+		}
+		else if (!strncmp(buffer + i, "child", 5))
+		{
+			// This process was spawned as the fork() child.
+			isChild = true;
+			i += 5;
 			break;
 		}
-
+		else
+		{
+			// Unknown argument; skip to next token.
+			while (buffer[i] != ' ' && buffer[i] != 0)
+				i++;
+			if (buffer[i] == ' ') i++;
+		}
 	}
 
+	// Simulate fork() for UWP: spawn a suspended child and return its PID to the parent.
+	// The child detects the --child flag above and skips re-forking.
+	int forkResult = fork_uwp(isChild, wroot, argc);
 
+	delete[] buffer;
 
-/*	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, GetCurrentProcessId());
-
-	char sid[100];
-	DWORD outLen;
-
-
-	if (GetTokenInformation(hProcess, TOKEN_INFORMATION_CLASS::TokenOwner, sid, 100, &outLen))
+	if (forkResult > 0)
 	{
-		DebugLog("process handle");
-		DebugLog(" %s\n", sid);
-	}*/
+		// Parent path: child has been spawned and resumed; parent exits cleanly.
+		DebugLog("fork_uwp: parent, child PID = %d\n", forkResult);
+	}
+	else if (forkResult == 0)
+	{
+		// Child path: continue below and execute the module entry point.
+		DebugLog("fork_uwp: executing as child process\n");
+	}
+	else
+	{
+		DebugLog("fork_uwp: failed, continuing without fork\n");
+	}
 
 	init(wroot.c_str());
-
 
 	return start();
 }

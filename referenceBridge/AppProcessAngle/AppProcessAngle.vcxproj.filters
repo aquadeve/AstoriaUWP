@@ -710,6 +710,285 @@
     <None Include="..\Android\lib\X86\libprocessgroup.dll">
       <Filter>Binaries</Filter>
     </None>
+    <None Include="..\android\lib\x64\dex2oat.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libandroid.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libandroidfw.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libandroid_runtime.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libart-compiler.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libart.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libaudioutils.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libbacktrace.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libbase.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libbcinfo.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libbinary_parse.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libbinder.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libc++.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libc.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libcamera_client.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libcamera_metadata.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libcrypto.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libcutils.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libdng_sdk.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libdrmframework.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libexpat.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libft2.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libGLESv1_CM.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libgui.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libhardware.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libhardware_legacy.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libharfbuzz_ng.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libhwui.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libicui18n.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libicuuc.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libimage_type_recognition.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libimg_utils.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libinput.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libjavacore.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libjnigraphics.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libjpeg.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\liblog.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\liblz4.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\liblzma.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libm.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libmedia.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libmediandk.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libmediautils.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libmemtrack.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libmemunreachable.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libminikin.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libnativebridge.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libnativehelper.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libnativeloader.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libnetd_client.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libnetutils.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libopenjdk.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libopenjdkjvm.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libpackagelistparser.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libpcre.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libpdfium.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libpiex.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libpng.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libpowermanager.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libprotobuf-cpp-lite.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libradio.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libradio_metadata.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libselinux.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libskia.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libsonivox.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libsoundtrigger.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libspeexresampler.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libsqlite.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libstagefright.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libstagefright_foundation.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libstagefright_http_support.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libstdc++.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libsync.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libtest_syscalls.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libtiff_directory.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libui.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libunwind.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libusbhost.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libutils.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libvixl.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libvulkan.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libwebviewchromium_plat_support.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libwilhelm.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libz.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\linker.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libLLVM.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libOpenMAXAL.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libOpenSLES.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libRS.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libRS_internal.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\libRScpp.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\patchoat.dll">
+      <Filter>Binaries</Filter>
+    </None>
+    <None Include="..\android\lib\x64\app_process64.dll">
+      <Filter>Binaries</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="root\system\etc\public.libraries.txt" />

@@ -6,15 +6,19 @@ configuration:
 platform:
 - x86
 - ARM
+- x64
 environment:
   AngleRootPath: '%APPVEYOR_BUILD_FOLDER%\angle'
 install:
 - cmd: >-
-    git submodule update --init --recursive
-    
-    set
+    git submodule update --init --recursive --depth=1
+
+    rem Note: --depth=1 gives shallow submodule clones (significantly faster).
+    rem If any submodule has further nested submodules that fail to fetch,
+    rem remove --depth=1 for a full clone.
+
 before_build:
-- cmd:  >-
+- cmd: >-
     SET ANGLE_PLATFORM=%Platform%
 
     IF %ANGLE_PLATFORM%==x86 SET ANGLE_PLATFORM=Win32

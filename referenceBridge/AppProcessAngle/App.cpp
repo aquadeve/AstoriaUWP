@@ -22,6 +22,31 @@ using namespace Platform;
 using namespace Windows::System::Threading;
 using namespace AppProcessAngle;
 
+namespace
+{
+	void try_flinit(const wchar_t* packageFolderPath, const wchar_t* localFolderPath)
+	{
+		__try
+		{
+			flinit(packageFolderPath, localFolderPath);
+		}
+		__except ((OutputDebugStringA("Android Runtime: flinit raised an unhandled exception\n"), EXCEPTION_EXECUTE_HANDLER))
+		{
+		}
+	}
+
+	void try_call_main()
+	{
+		__try
+		{
+			call_main(bridge_get_default_app_process_module());
+		}
+		__except ((OutputDebugStringA("Android Runtime: unhandled exception in call_main\n"), EXCEPTION_EXECUTE_HANDLER))
+		{
+		}
+	}
+}
+
 // Helper to convert a length in device-independent pixels (DIPs) to a length in physical pixels.
 inline float ConvertDipsToPixels(float dips, float dpi)
 {
@@ -96,7 +121,9 @@ void App::Load(Platform::String^ entryPoint)
 
 	packageFolderPath = Platform::String::Concat(packageFolderPath, L"\\root");
 
-	flinit(packageFolderPath->Data(), localFolderPath->Data());
+	// flinit may raise structured exceptions (access violations etc.) that are
+	// handled by FLinux internally; catch anything that escapes here.
+	try_flinit(packageFolderPath->Data(), localFolderPath->Data());
 
     RecreateRenderer();
 
@@ -106,6 +133,12 @@ void App::Load(Platform::String^ entryPoint)
 	{
 		CWinDebugMonitor m_debugMonitor;
 		std::string strA;
+
+		if (m_debugMonitor.IsStopped())
+		{
+			OutputDebugStringA("Android Runtime: WinDebugMonitor unavailable, skipping DBWIN relay\n");
+			return;
+		}
 
 		while (!m_debugMonitor.IsStopped())
 		{
@@ -137,12 +170,16 @@ void App::Load(Platform::String^ entryPoint)
 
 	m_workItem = ThreadPool::RunAsync(workItem, WorkItemPriority::High, WorkItemOptions::TimeSliced);
 
+	auto runtimeWorkItem = ref new WorkItemHandler(
+		[](IAsyncAction^ workItem)
+	{
+		// Wrap the Android Runtime launch in a native SEH helper so that any
+		// structured exception escaping the runtime is logged instead of
+		// terminating the entire UWP host process.
+		try_call_main();
+	});
 
-
-
-	call_main(L"app_process32.dll");
-	//call_main(L"patchoat.dll");
-	//call_main(L"libtest_syscalls");
+	m_runtimeWorkItem = ThreadPool::RunAsync(runtimeWorkItem, WorkItemPriority::High, WorkItemOptions::TimeSliced);
 
 }
 

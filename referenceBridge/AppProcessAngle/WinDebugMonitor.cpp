@@ -7,7 +7,7 @@
 //       E-Mail: cpp.china@hotmail.com
 //
 //////////////////////////////////////////////////////////////
-#include "pch.h""
+#include "pch.h"
 
 #include "WinDebugMonitor.h"
 #include <stdio.h>
@@ -24,6 +24,13 @@
 // ----------------------------------------------------------------------------
 
 CWinDebugMonitor::CWinDebugMonitor()
+	: m_hDBWinMutex(NULL),
+	  m_hDBMonBuffer(NULL),
+	  m_hEventBufferReady(NULL),
+	  m_hEventDataReady(NULL),
+	  m_hWinDebugMonitorThread(NULL),
+	  m_bWinDebugMonStopped(TRUE),
+	  m_pDBBuffer(NULL)
 {
 	if (Initialize() != 0) {
 		::OutputDebugString(L"CWinDebugMonitor::Initialize failed.\n");
@@ -136,7 +143,7 @@ DWORD CWinDebugMonitor::Initialize()
 		return errorCode;
 	}
 
-	m_bWinDebugMonStopped = false;
+	m_bWinDebugMonStopped = FALSE;
 	
 	return errorCode;
 }
@@ -174,6 +181,10 @@ void CWinDebugMonitor::Unintialize()
 
 const char* CWinDebugMonitor::GetDebugString()
 {
+	if (m_hEventDataReady == NULL || m_pDBBuffer == NULL) {
+		return NULL;
+	}
+
 	DWORD ret = 0;
 	
 	// wait for data ready
@@ -189,6 +200,10 @@ const char* CWinDebugMonitor::GetDebugString()
 
 void CWinDebugMonitor::BufferReady()
 {
+	if (m_hEventBufferReady == NULL) {
+		return;
+	}
+
 	// signal buffer ready
 	SetEvent(m_hEventBufferReady);
 

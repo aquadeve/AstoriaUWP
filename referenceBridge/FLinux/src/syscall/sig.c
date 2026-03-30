@@ -432,7 +432,35 @@ void signal_restorer();
 static void signal_save_sigcontext(struct sigcontext *sc, struct syscall_context *context, void *fpstate, uint32_t mask)
 {
 	/* TODO: Add missing register values */
-#ifdef _M_X86
+#if defined(_M_X64)
+	sc->r8 = context->r8;
+	sc->r9 = context->r9;
+	sc->r10 = context->r10;
+	sc->r11 = context->r11;
+	sc->r12 = context->r12;
+	sc->r13 = context->r13;
+	sc->r14 = context->r14;
+	sc->r15 = context->r15;
+	sc->di = context->rdi;
+	sc->si = context->rsi;
+	sc->bp = context->rbp;
+	sc->bx = context->rbx;
+	sc->dx = context->rdx;
+	sc->ax = context->rax;
+	sc->cx = context->rcx;
+	sc->sp = context->rsp;
+	sc->ip = context->rip;
+	sc->flags = context->rflags;
+	sc->cs = 0;
+	sc->gs = 0;
+	sc->fs = 0;
+	sc->ss = 0;
+	sc->trapno = 0;
+	sc->err = 0;
+	sc->oldmask = mask;
+	sc->cr2 = 0;
+	sc->fpstate = (uint64_t)(uintptr_t)fpstate;
+#elif defined(_M_IX86)
 	sc->gs = 0;
 	sc->fs = 0;
 	sc->es = 0;
@@ -478,6 +506,23 @@ void signal_setup_handler(struct syscall_context *context)
 	sp = ((sp + 4) & ~(16UL-1)) - 4;
 
 	struct rt_sigframe *frame = (struct rt_sigframe *)sp;
+#if defined(_M_X64)
+	frame->pretcode = (char *)(uintptr_t)signal->actions[sig].sa_restorer; /* FIXME: fix race */
+	if (frame->pretcode == NULL)
+		frame->pretcode = (char *)(uintptr_t)signal_restorer;
+	frame->info = current_thread->current_siginfo;
+	frame->uc.uc_flags = 0;
+	frame->uc.uc_link = 0;
+	/* TODO: frame->uc.uc_stack */
+	EnterCriticalSection(&signal->mutex);
+	frame->uc.uc_sigmask = (uint64_t)current_thread->sigmask;
+	signal_save_sigcontext(&frame->uc.uc_mcontext, context, fpstate, (uint32_t)current_thread->sigmask);
+	sigaddset(&current_thread->sigmask, sig);
+	current_thread->sigmask |= signal->actions[sig].sa_mask; /* FIXME: fix race */
+	current_thread->can_accept_signal = true;
+	ResetEvent(current_thread->sigevent);
+	LeaveCriticalSection(&signal->mutex);
+#else
 	frame->pretcode = (uint32_t)signal->actions[sig].sa_restorer; /* FIXME: fix race */
 	if (frame->pretcode == 0)
 		frame->pretcode = (uint32_t)signal_restorer;
@@ -498,13 +543,23 @@ void signal_setup_handler(struct syscall_context *context)
 	ResetEvent(current_thread->sigevent);
 	LeaveCriticalSection(&signal->mutex);
 	/* TODO: frame->retcode */
+#endif
 
 	/* Redirect control flow to handler */
+#if defined(_M_X64)
+	/* Linux x86_64 System V ABI: first three args in rdi, rsi, rdx */
+	context->rsp = (DWORD64)(uintptr_t)frame;
+	context->rip = (DWORD64)(uintptr_t)signal->actions[sig].sa_handler; /* FIXME: fix race */
+	context->rdi = (DWORD64)sig;
+	context->rsi = (DWORD64)(uintptr_t)&frame->info;
+	context->rdx = (DWORD64)(uintptr_t)&frame->uc;
+#elif defined(_M_IX86)
 	context->esp = (DWORD)frame;
 	context->eip = (DWORD)signal->actions[sig].sa_handler; /* FIXME: fix race */
 	context->eax = (DWORD)sig;
 	context->edx = (DWORD)&frame->info;
 	context->ecx = (DWORD)&frame->uc;
+#endif
 }
 
 static void send_packet(HANDLE sigwrite, struct signal_packet *packet)
@@ -573,7 +628,11 @@ DEFINE_SYSCALL(rt_sigreturn, uintptr_t, bx, uintptr_t, cx, uintptr_t, dx, uintpt
 		return -L_EFAULT;
 	}
 	/* TODO: Check validity of fpstate */
+#ifdef _WIN64
+	fpu_fxrstor((void *)(uintptr_t)frame->uc.uc_mcontext.fpstate);
+#else
 	fpu_fxrstor(frame->uc.uc_mcontext.fpstate);
+#endif
 	EnterCriticalSection(&signal->mutex);
 	current_thread->sigmask = frame->uc.uc_sigmask;
 	send_pending_signal();

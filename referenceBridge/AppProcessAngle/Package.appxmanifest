@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" IgnorableNamespaces="uap mp">
-  <Identity Name="fb4715f7-7e0d-42c0-85af-da91b108aec1" Publisher="CN=Václav" Version="1.0.7.0" />
+  <Identity Name="fb4715f7-7e0d-42c0-85af-da91b108aec1" Publisher="CN=dev" Version="1.0.8.0" />
   <mp:PhoneIdentity PhoneProductId="fb4715f7-7e0d-42c0-85af-da91b108aec1" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>AppProcessAngle</DisplayName>

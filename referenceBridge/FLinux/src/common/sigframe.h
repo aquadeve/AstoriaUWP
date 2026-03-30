@@ -4,6 +4,25 @@
 #include <common/signal.h>
 #include <common/sigcontext.h>
 
+#ifdef _WIN64
+/* 64-bit signal frames */
+struct sigframe
+{
+	char *pretcode;
+	int sig;
+	struct sigcontext sc;
+	/* fp state follows here */
+};
+
+struct rt_sigframe
+{
+	char *pretcode;
+	struct ucontext uc;
+	struct siginfo info;
+	/* fp state follows here */
+};
+#else
+/* 32-bit signal frames */
 struct sigframe
 {
 	uint32_t pretcode;
@@ -26,3 +45,5 @@ struct rt_sigframe
 	char retcode[8];
 	/* fp state follows here */
 };
+#endif
+

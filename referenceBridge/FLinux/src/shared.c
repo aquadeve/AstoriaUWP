@@ -89,8 +89,9 @@ static void shared_create_object_directory()
 	LONG ret;
 	if (!GetAppContainerNamedObjectPath(NULL, NULL, sizeof(appname_buf), appname_buf, &ret))
 	{
-		log_error("GetAppContainerNamedObjectPath() failed, error: %x", GetLastError());
-		NtTerminateProcess(NtCurrentProcess(), 1);
+		DWORD error = GetLastError();
+		log_warning("GetAppContainerNamedObjectPath() failed, error: %x. Falling back to BaseNamedObjects.", error);
+		wcscpy_s(appname_buf, sizeof(appname_buf) / sizeof(appname_buf[0]), L"BaseNamedObjects");
 	}
 
 	DWORD sessionId;

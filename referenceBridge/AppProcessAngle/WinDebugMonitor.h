@@ -10,7 +10,7 @@
 
 #ifndef __WIN_DEBUG_BUFFER_H__
 #define __WIN_DEBUG_BUFFER_H__
-#include "pch.h""
+#include "pch.h"
 
 class CWinDebugMonitor
 {

@@ -127,6 +127,50 @@ struct xstate
 	struct ymmh_state ymmh;
 };
 
+#ifdef _WIN64
+/* 64-bit signal context (mirrors Linux sigcontext_64 from arch/x86/include/uapi/asm/sigcontext.h) */
+struct sigcontext
+{
+	uint64_t r8;
+	uint64_t r9;
+	uint64_t r10;
+	uint64_t r11;
+	uint64_t r12;
+	uint64_t r13;
+	uint64_t r14;
+	uint64_t r15;
+	uint64_t di;
+	uint64_t si;
+	uint64_t bp;
+	uint64_t bx;
+	uint64_t dx;
+	uint64_t ax;
+	uint64_t cx;
+	uint64_t sp;
+	uint64_t ip;
+	uint64_t flags;
+	uint16_t cs;
+	uint16_t gs;
+	uint16_t fs;
+	uint16_t ss;
+	uint64_t err;
+	uint64_t trapno;
+	uint64_t oldmask;
+	uint64_t cr2;
+	uint64_t fpstate; /* pointer to _fpstate_64 or _xstate */
+	uint64_t reserved1[8];
+};
+
+struct ucontext
+{
+	uint64_t     uc_flags;
+	uint64_t     uc_link;
+	stack_t      uc_stack;
+	uint64_t     uc_sigmask;
+	struct sigcontext uc_mcontext;
+};
+#else
+/* 32-bit signal context (mirrors Linux sigcontext_32 from arch/x86/include/uapi/asm/sigcontext.h) */
 struct sigcontext
 {
 	uint16_t gs, __gsh;
@@ -162,3 +206,4 @@ struct ucontext
 	struct sigcontext uc_mcontext;
 	sigset_t uc_sigmask;
 };
+#endif

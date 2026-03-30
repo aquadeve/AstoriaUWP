@@ -41,6 +41,7 @@ namespace AppProcessAngle
 
         std::unique_ptr<SimpleRenderer> mCubeRenderer;
 		Windows::Foundation::IAsyncAction^ m_workItem;
+		Windows::Foundation::IAsyncAction^ m_runtimeWorkItem;
     };
 
 }

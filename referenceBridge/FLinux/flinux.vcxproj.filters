@@ -264,6 +264,7 @@
     <ClInclude Include="src\linux\random.h" />
     <ClInclude Include="src\onecore_types.h" />
     <ClInclude Include="src\platform\arm\context.h" />
+    <ClInclude Include="src\platform\x64\context.h" />
     <ClInclude Include="src\syscall\kernel_helper.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="src\platform\x86\context.h" />
@@ -274,6 +275,9 @@
     </ClCompile>
     <ClCompile Include="src\log.c" />
     <ClCompile Include="src\syscall\syscall.c">
+      <Filter>syscall</Filter>
+    </ClCompile>
+    <ClCompile Include="src\syscall\syscall_dispatch.c">
       <Filter>syscall</Filter>
     </ClCompile>
     <ClCompile Include="src\syscall\process.c">
@@ -362,5 +366,13 @@
     <ClCompile Include="src\fs\memory.c" />
     <ClCompile Include="src\memutils.c" />
     <ClCompile Include="src\syscall\kernel_helper.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="src\syscall\stubs64.asm">
+      <Filter>syscall</Filter>
+    </MASM>
+    <MASM Include="src\syscall\stubs.asm">
+      <Filter>syscall</Filter>
+    </MASM>
   </ItemGroup>
 </Project>
