@@ -3,6 +3,8 @@
 // and the appropriate CPU interpreter to fully execute a Linux ELF binary
 // inside the AstoriaUWP Android compatibility layer.
 //
+// Debug logging: Extended tracing compiled only in DEBUG builds.
+//
 // Usage:
 //   var exec = new ElfExecutor(mode, appRoot);
 //   await exec.LoadAndRunAsync(elfBytes, argv, envp);
@@ -215,6 +217,7 @@ namespace DalvikUWPCSharp.FLinux
             }
 
             // Register JNI exports so DalvikCPU can call them via the JNI bridge.
+            int jniRegistered = 0;
             foreach (string jniFunc in loader.GetJniExports())
             {
                 var parsed = ParseJniName(jniFunc);
@@ -231,12 +234,20 @@ namespace DalvikUWPCSharp.FLinux
                     jniEnv.RegisterNativeMethod(cls, method, sig,
                         (env2, thisObj, args2) =>
                         {
-                            Debug.WriteLine($"[ElfExecutor] JNI call: {capturedFunc}");
+#if DEBUG
+                            Debug.WriteLine($"[ElfExecutor] JNI call: {capturedFunc} args={args2?.Length ?? 0}");
+#endif
                             return JniValue.FromObject(null);
                         });
                     Debug.WriteLine($"[ElfExecutor]   Registered JNI: {cls}#{method}{sig}");
+                    jniRegistered++;
                 }
             }
+
+#if DEBUG
+            Debug.WriteLine($"[ElfExecutor] {libName}: registered {jniRegistered} JNI methods, " +
+                            $"{loader.NeededLibraries.Count} dependencies: [{string.Join(", ", loader.NeededLibraries)}]");
+#endif
 
             return loader;
         }
