@@ -159,7 +159,7 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
         public const int getrlimit        = 163;
         public const int prlimit64        = 261;
         public const int getcwd           =  17;
-        public const int mkdir            = unchecked((int)0xFFFFFFFF); // not in arm64; use mkdirat
+        public const int mkdir_unavailable = unchecked((int)0xFFFFFFFF); // not a native ARM64 syscall; use mkdirat instead
         public const int mkdirat          =  34;
         public const int unlinkat         =  35;
         public const int renameat         =  38;

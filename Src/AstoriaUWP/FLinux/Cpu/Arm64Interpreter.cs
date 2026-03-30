@@ -461,9 +461,9 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                 if (op54 == 0) // MADD/MSUB (sf=1: 64-bit, sf=0: 32-bit)
                     res = sf ? (isMSub ? rav - rnv * rmv : rav + rnv * rmv)
                                : (ulong)((uint)rav + (uint)((isMSub ? 0u - (uint)rnv * (uint)rmv : (uint)rnv * (uint)rmv)));
-                else if (op54 == 2) // SMULH
-                    res = (ulong)(((Int128)(long)rnv * (long)rmv) >> 64);
-                else // UMULH
+                else if (op54 == 2) // SMULH – upper 64 bits of signed 64×64 product
+                    res = (ulong)((Int128)(long)rnv * (long)rmv).Upper;
+                else // UMULH – upper 64 bits of unsigned 64×64 product
                     res = ((UInt128)rnv * rmv).Upper;
                 Xw(rd, sf ? res : res & 0xFFFFFFFF);
                 return true;
@@ -671,6 +671,8 @@ namespace DalvikUWPCSharp.FLinux.Cpu
         private readonly long _hi;
         private readonly ulong _lo;
         public Int128(long hi, ulong lo) { _hi = hi; _lo = lo; }
+        /// <summary>Upper 64 bits (the high half of the 128-bit product).</summary>
+        public long Upper => _hi;
         public static Int128 operator *(long a, long b)
         {
             // 64×64 → 128-bit signed multiply.
@@ -681,7 +683,6 @@ namespace DalvikUWPCSharp.FLinux.Cpu
             long hi   = neg ? (long)(~hi2 + (lo == 0 ? 1u : 0u)) : (long)hi2;
             return new Int128(hi, lo);
         }
-        public static long operator >>(Int128 a, int shift) => a._hi; // return upper 64 bits
     }
 
     internal static class MathEx

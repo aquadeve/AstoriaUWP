@@ -314,7 +314,9 @@ namespace DalvikUWPCSharp.FLinux.Core
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            _rng.NextBytes(buffer);
+            byte[] temp = new byte[count];
+            _rng.NextBytes(temp);
+            Array.Copy(temp, 0, buffer, offset, count);
             return count;
         }
 

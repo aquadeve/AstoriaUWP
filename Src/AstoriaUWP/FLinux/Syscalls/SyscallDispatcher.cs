@@ -581,7 +581,9 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
             if (tvAddr != 0)
             {
                 long unixTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                long usec     = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1000 * 1000;
+                // Microseconds within the current second (ticks → microseconds).
+                long usec = (DateTimeOffset.UtcNow.Ticks % TimeSpan.TicksPerSecond)
+                            / (TimeSpan.TicksPerMillisecond / 1000);
                 _memory.WriteUInt64(tvAddr,     (ulong)unixTime);
                 _memory.WriteUInt64(tvAddr + 8, (ulong)usec);
             }

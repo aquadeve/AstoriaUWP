@@ -231,10 +231,12 @@ namespace DalvikUWPCSharp.FLinux.Cpu
                     if (op2 == 0xB6 || op2 == 0xBE || op2 == 0xB7 || op2 == 0xBF)
                     {
                         (int rd, int rm, long disp) = DecodeModRM(rexR, rexB, rexX);
-                        ulong val = ReadRmOrMem(rm, disp, op2 == 0xB6 || op2 == 0xB7 ? 1 : 2);
+                        // 0xB6/0xBE: source is byte (8-bit); 0xB7/0xBF: source is word (16-bit).
+                        int srcSz = (op2 == 0xB6 || op2 == 0xBE) ? 1 : 2;
+                        ulong val = ReadRmOrMem(rm, disp, srcSz);
                         bool sign = op2 == 0xBE || op2 == 0xBF;
-                        if (sign) val = (op2 == 0xBE) ? (ulong)(long)(sbyte)(byte)val
-                                                       : (ulong)(long)(short)(ushort)val;
+                        if (sign) val = (srcSz == 1) ? (ulong)(long)(sbyte)(byte)val
+                                                     : (ulong)(long)(short)(ushort)val;
                         WriteReg(rd, rexW ? val : val & 0xFFFFFFFF, rexW);
                         return true;
                     }

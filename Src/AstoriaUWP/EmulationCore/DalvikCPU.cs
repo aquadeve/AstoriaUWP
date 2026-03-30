@@ -1504,7 +1504,10 @@ namespace DalvikUWPCSharp.Classes
                         if (Directory.Exists(altPath))
                         {
                             libPath = altPath;
-                            // Only auto-switch if the user left the default (ARM32).
+                            // Auto-switch the execution mode only when the current mode was not
+                            // explicitly changed by the user (i.e. it still holds the default ARM32
+                            // value).  A user-selected mode (set via the EmuPage ComboBox) is
+                            // honoured regardless of which ABI folders are available.
                             if (execMode == ExecutionMode.Arm32 && mode != ExecutionMode.Arm32)
                             {
                                 execMode = mode;

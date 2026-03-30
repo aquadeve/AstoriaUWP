@@ -148,13 +148,14 @@ namespace DalvikUWPCSharp.FLinux
                 : _loadedExe.EntryPoint;
             _cpu.PC = entry;
 
-            // For ARM32 Thumb entry points (bit 0 set), align and set Thumb mode.
+            // For ARM32 Thumb entry points (bit 0 set), align and enable Thumb mode.
             if (Mode == ExecutionMode.Arm32 && (entry & 1) != 0)
             {
                 _cpu.PC = entry & ~1UL;
-                // Signal Thumb mode via ArmInterpreter's CPSR T-bit.
+                // ArmInterpreter uses register index 16 as the CPSR pseudo-register (beyond R0–R15).
+                // Setting bit 5 (0x20) of CPSR enables Thumb instruction decoding.
                 if (_cpu is ArmInterpreter arm)
-                    arm.SetRegister(16, 0x20); // CPSR Thumb bit – re-set via CPSR register index convention
+                    arm.SetRegister(16, 0x20); // index 16 = CPSR; bit 5 = Thumb (T) flag
             }
 
             Debug.WriteLine($"[ElfExecutor] Loaded. Entry=0x{entry:X} SP=0x{sp:X} Mode={Mode}");

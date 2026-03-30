@@ -88,8 +88,28 @@ namespace DalvikUWPCSharp.FLinux.Cpu
 
         public LinuxMemory Memory => _memory;
 
-        public ulong GetRegister(int index) => (index >= 0 && index < 16) ? _r[index] : 0;
-        public void SetRegister(int index, ulong value) { if (index >= 0 && index < 16) _r[index] = (uint)value; }
+        /// <summary>
+        /// Read a register by index.
+        /// Indices 0–15 map to R0–R15 (R13=SP, R14=LR, R15=PC).
+        /// Index 16 is a pseudo-register that reads the CPSR.
+        /// </summary>
+        public ulong GetRegister(int index)
+        {
+            if (index >= 0 && index < 16) return _r[index];
+            if (index == 16) return _cpsr; // CPSR pseudo-register
+            return 0;
+        }
+
+        /// <summary>
+        /// Write a register by index.
+        /// Indices 0–15 map to R0–R15.
+        /// Index 16 writes the CPSR (used by ElfExecutor to set Thumb mode before entry).
+        /// </summary>
+        public void SetRegister(int index, ulong value)
+        {
+            if (index >= 0 && index < 16)  _r[index] = (uint)value;
+            else if (index == 16)          _cpsr      = (uint)value;
+        }
 
         public async Task RunAsync()
         {
@@ -262,7 +282,7 @@ namespace DalvikUWPCSharp.FLinux.Cpu
             {
                 case 0:  result = rnVal & op2;   break; // AND
                 case 1:  result = rnVal ^ op2;   break; // EOR
-                case 2:  result = Sub32(rnVal, op2, 0, setFlags, out _); writeResult = (rd != 15); break; // SUB
+                case 2:  result = Sub32(rnVal, op2, 0, setFlags, out _); break; // SUB
                 case 3:  result = Sub32(op2, rnVal, 0, setFlags, out _); break; // RSB
                 case 4:  result = Add32(rnVal, op2, 0, setFlags, out _); break; // ADD
                 case 5:  result = Add32(rnVal, op2, C ? 1u : 0u, setFlags, out _); break; // ADC

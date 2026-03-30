@@ -465,6 +465,12 @@ namespace DalvikUWPCSharp
 
         // ExecModeCombo_SelectionChanged – update SelectedExecutionMode and,
         // if a NativeExecutor already exists, change its mode on the fly.
+        //
+        // NOTE: Changing the mode after library loading has already started is supported
+        // for informational purposes (the new mode will apply to subsequent LoadLibrary /
+        // LoadAndRunAsync calls).  ELF binaries that were already mapped into LinuxMemory
+        // under the previous mode are NOT re-interpreted; the change takes effect for the
+        // next native execution context that is created.
         private void ExecModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (ExecModeCombo.SelectedItem is ComboBoxItem item)
