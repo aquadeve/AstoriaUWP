@@ -6,6 +6,7 @@ using System;
 using System.Diagnostics;
 using Windows.Foundation;
 using Windows.UI;
+using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
@@ -27,14 +28,28 @@ namespace DalvikUWPCSharp.Reassembly.UI
         private double canvasWidth;
         private double canvasHeight;
 
+        /// <summary>
+        /// The currently active render surface. Set when a surface is created for
+        /// native rendering so that GL stubs can direct drawing commands here.
+        /// </summary>
+        public static AndroidRenderSurface Current { get; set; }
+
+        // GL clear color stored by glClearColor, applied by glClear.
+        // Stored as an int (ARGB) so it can be written from any thread.
+        private volatile int glClearColorArgb = unchecked((int)0xFF000000); // default black
+
+        // Dispatcher captured at construction time (UI thread) for safe cross-thread updates.
+        private CoreDispatcher uiDispatcher;
+
         public AndroidRenderSurface()
         {
             renderCanvas = new Canvas();
             renderCanvas.HorizontalAlignment = HorizontalAlignment.Stretch;
             renderCanvas.VerticalAlignment = VerticalAlignment.Stretch;
-            renderCanvas.Background = new SolidColorBrush(Colors.White);
+            renderCanvas.Background = new SolidColorBrush(Colors.Transparent);
             this.Content = renderCanvas;
             this.SizeChanged += OnSizeChanged;
+            uiDispatcher = Window.Current?.Dispatcher;
         }
 
         public AndroidRenderSurface(double width, double height) : this()
@@ -49,6 +64,53 @@ namespace DalvikUWPCSharp.Reassembly.UI
         {
             canvasWidth = e.NewSize.Width;
             canvasHeight = e.NewSize.Height;
+        }
+
+        /// <summary>
+        /// Stores the GL clear color (called from the GLES20 glClearColor stub).
+        /// Thread-safe: only writes an int field.
+        /// </summary>
+        public void SetGLClearColor(float r, float g, float b, float a)
+        {
+            byte ab = (byte)Math.Min(255, Math.Max(0, (int)(a * 255)));
+            byte rb = (byte)Math.Min(255, Math.Max(0, (int)(r * 255)));
+            byte gb = (byte)Math.Min(255, Math.Max(0, (int)(g * 255)));
+            byte bb = (byte)Math.Min(255, Math.Max(0, (int)(b * 255)));
+            glClearColorArgb = (ab << 24) | (rb << 16) | (gb << 8) | bb;
+        }
+
+        /// <summary>
+        /// Clears the render surface with the previously set GL clear color
+        /// (called from the GLES20 glClear stub). Dispatches to the UI thread.
+        /// </summary>
+        public void GLClear()
+        {
+            int argb = glClearColorArgb;
+            byte a = (byte)((argb >> 24) & 0xFF);
+            byte r = (byte)((argb >> 16) & 0xFF);
+            byte g = (byte)((argb >> 8) & 0xFF);
+            byte b = (byte)(argb & 0xFF);
+            var color = Color.FromArgb(a, r, g, b);
+
+            if (uiDispatcher != null)
+            {
+                _ = uiDispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    try
+                    {
+                        renderCanvas.Children.Clear();
+                        renderCanvas.Background = new SolidColorBrush(color);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[AndroidRenderSurface] GLClear dispatch error: " + ex.Message);
+                    }
+                });
+            }
+            else
+            {
+                Debug.WriteLine("[AndroidRenderSurface] GLClear skipped – no UI dispatcher available.");
+            }
         }
 
         /// <summary>
@@ -226,7 +288,7 @@ namespace DalvikUWPCSharp.Reassembly.UI
         public void Clear()
         {
             renderCanvas.Children.Clear();
-            renderCanvas.Background = new SolidColorBrush(Colors.White);
+            renderCanvas.Background = new SolidColorBrush(Colors.Transparent);
         }
 
         /// <summary>

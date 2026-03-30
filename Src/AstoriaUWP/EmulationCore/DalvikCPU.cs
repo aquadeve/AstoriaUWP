@@ -1305,6 +1305,7 @@ namespace DalvikUWPCSharp.Classes
                         var surface = new AndroidRenderSurface();
                         surface.HorizontalAlignment = HorizontalAlignment.Stretch;
                         surface.VerticalAlignment = VerticalAlignment.Stretch;
+                        AndroidRenderSurface.Current = surface;
                         hostPage.SetNativeRenderSurface(surface);
                     }
                     else if (arg0 != null)

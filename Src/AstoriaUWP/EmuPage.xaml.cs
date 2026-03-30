@@ -208,6 +208,20 @@ namespace DalvikUWPCSharp
                         Debug.WriteLine("[EmuPage] [Render] RenderTargetGrid.Children.Add exception: " + ex3.Message);
                     }
                 }
+                else
+                {
+                    // Layout XML was found but rendering failed – fall back to a native
+                    // render surface so the app's programmatic drawing can still appear.
+                    Debug.WriteLine("[EmuPage] [Render] RenderXmlFile returned null – falling back to native render surface.");
+                    if (RenderTargetGrid.Children.Count == 0)
+                    {
+                        var fallbackSurface = new DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface();
+                        fallbackSurface.HorizontalAlignment = HorizontalAlignment.Stretch;
+                        fallbackSurface.VerticalAlignment = VerticalAlignment.Stretch;
+                        DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = fallbackSurface;
+                        RenderTargetGrid.Children.Add(fallbackSurface);
+                    }
+                }
             }
             else
             {
@@ -221,6 +235,7 @@ namespace DalvikUWPCSharp
                     var nativeSurface = new DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface();
                     nativeSurface.HorizontalAlignment = HorizontalAlignment.Stretch;
                     nativeSurface.VerticalAlignment = VerticalAlignment.Stretch;
+                    DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = nativeSurface;
                     RenderTargetGrid.Children.Add(nativeSurface);
                     Debug.WriteLine("[EmuPage] [Render] Native render surface ready.");
                 }
@@ -251,6 +266,7 @@ namespace DalvikUWPCSharp
         public void SetNativeRenderSurface(DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface surface)
         {
             Debug.WriteLine("[EmuPage] SetNativeRenderSurface called.");
+            DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = surface;
             RenderTargetGrid.Children.Clear();
             RenderTargetGrid.Children.Add(surface);
         }//SetNativeRenderSurface end
