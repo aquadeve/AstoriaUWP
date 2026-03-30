@@ -103,8 +103,7 @@ namespace DalvikUWPCSharp
                     
                     if (cpu != null)
                     {
-                        cpu.Start();
-                        //await 
+                        await cpu.Start();
                         Render();
                     }
                     else
@@ -199,9 +198,17 @@ namespace DalvikUWPCSharp
                 {
                     try
                     {
-                        RenderTargetGrid.Children.Clear();
-                        RenderTargetGrid.Children.Add(renderedLayout);
-                        Debug.WriteLine("[EmuPage] [Render] XML layout added to RenderTargetGrid.");
+                        // Only populate the grid from the fallback renderer if Start()/setContentView
+                        // has not already set it up. If the grid is already populated we leave it alone.
+                        if (RenderTargetGrid.Children.Count == 0)
+                        {
+                            RenderTargetGrid.Children.Add(renderedLayout);
+                            Debug.WriteLine("[EmuPage] [Render] XML layout added to RenderTargetGrid.");
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[EmuPage] [Render] RenderTargetGrid already populated by setContentView, skipping XML layout.");
+                        }
                     }
                     catch (Exception ex3)
                     {

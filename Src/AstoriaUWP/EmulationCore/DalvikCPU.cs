@@ -151,7 +151,7 @@ namespace DalvikUWPCSharp.Classes
             Debug.WriteLine(new string(' ', callDepth * 2) + "[DalvikCPU] " + message);
         }
 
-        public async void Start()
+        public async Task Start()
         {
             if (appContext == null)
             {
