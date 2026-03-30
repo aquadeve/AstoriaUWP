@@ -3,6 +3,9 @@
 // into a functional managed C# Dalvik VM.
 // Native .so execution is now handled by ElfExecutor (FLinux C# port),
 // which provides ARM32 / ARM64 / x64 software CPU interpreters.
+//
+// Debug logging: Extended tracing is compiled only in DEBUG builds via
+// #if DEBUG / [Conditional("DEBUG")] so release builds carry no overhead.
 
 using AndroidInteropLib;
 using AndroidInteropLib.android.content;
@@ -81,6 +84,12 @@ namespace DalvikUWPCSharp.Classes
         // Per-call-frame saved registers (to support nested RunMethod calls)
         private Stack<object[]> registerStack = new Stack<object[]>();
 
+        // Call depth counter for debug logging indentation
+        private int callDepth;
+
+        // String pool cache: resource ID -> string value (populated from DEX string table)
+        private Dictionary<int, string> stringResources = new Dictionary<int, string>();
+
         public DalvikCPU(Dex d, string pName, EmuPage hostPg)
         {
             dex = d;
@@ -104,6 +113,45 @@ namespace DalvikUWPCSharp.Classes
 
             // set preload status "Setting up app environment"
             hostPage.setPreloadStatusText("Setting up app environment...");
+
+            // Pre-populate string resources from the DEX string table for getString() calls
+            PopulateStringResources();
+        }
+
+        /// <summary>
+        /// Pre-loads string resources from the DEX string table so that getString(resId)
+        /// can return meaningful values.  This mirrors android.content.res.Resources.getString().
+        /// </summary>
+        private void PopulateStringResources()
+        {
+            try
+            {
+                // Cache all DEX strings keyed by their index – this provides a best-effort
+                // mapping for getString(int) where the int is a string-table index.
+                int count = 0;
+                try { foreach (string s in dex.GetStrings()) count++; } catch { }
+                int idx = 0;
+                foreach (string s in dex.GetStrings())
+                {
+                    try { stringResources[idx] = s; }
+                    catch { /* skip */ }
+                    idx++;
+                }
+#if DEBUG
+                Debug.WriteLine($"[DalvikCPU] Populated {stringResources.Count} string resources from DEX.");
+#endif
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[DalvikCPU] PopulateStringResources error: " + ex.Message);
+            }
+        }
+
+        /// <summary>Debug-only helper to emit a trace line with call-depth indentation.</summary>
+        [Conditional("DEBUG")]
+        private void TraceInstruction(string message)
+        {
+            Debug.WriteLine(new string(' ', callDepth * 2) + "[DalvikCPU] " + message);
         }
 
         public async void Start()
@@ -172,7 +220,14 @@ namespace DalvikUWPCSharp.Classes
             {
                 // Save current registers and push a new frame
                 registerStack.Push(Registers);
-                Registers = new object[16];
+
+                // Allocate register file based on the method's declared register count.
+                // Dalvik methods declare their register count in the code header.
+                // Fall back to 16 if the count is somehow zero (e.g. abstract/native stubs).
+                uint regCount = 0;
+                try { regCount = m.GetRegisterCount(); } catch { }
+                if (regCount < 1) regCount = 16;
+                Registers = new object[regCount];
 
                 // Copy arguments into low registers
                 if (obj != null)
@@ -180,6 +235,13 @@ namespace DalvikUWPCSharp.Classes
                     for (int i = 0; i < obj.Length && i < Registers.Length; i++)
                         Registers[i] = obj[i];
                 }
+
+                callDepth++;
+#if DEBUG
+                string mTypeName = "(unknown)";
+                try { mTypeName = dex.GetTypeName(m.ClassIndex); } catch { }
+                TraceInstruction($">>> Enter {mTypeName}.{m.Name} regs={regCount} args={obj?.Length ?? 0}");
+#endif
 
                 try
                 {
@@ -212,10 +274,17 @@ namespace DalvikUWPCSharp.Classes
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine("[DalvikCPU] RunMethod exception: " + ex.Message);
+                    Debug.WriteLine("[DalvikCPU] RunMethod exception in " + m.Name + ": " + ex.Message);
+#if DEBUG
+                    Debug.WriteLine("[DalvikCPU]   Stack trace: " + ex.StackTrace);
+#endif
                 }
                 finally
                 {
+#if DEBUG
+                    TraceInstruction($"<<< Exit {m.Name} result={result}");
+#endif
+                    callDepth--;
                     // Restore previous frame's registers
                     Registers = registerStack.Pop();
                 }
@@ -436,12 +505,14 @@ namespace DalvikUWPCSharp.Classes
                             Registers[ni.Destination] = Activator.CreateInstance(t);
                         else
                             Registers[ni.Destination] = new DalvikObject(typeName);
-                        Debug.WriteLine("[DalvikCPU] new-instance: " + typeName);
+#if DEBUG
+                        TraceInstruction("new-instance: " + typeName + (t != null ? " [managed]" : " [dalvik]"));
+#endif
                     }
                     catch (Exception ex)
                     {
                         Debug.WriteLine("[DalvikCPU] new-instance error: " + ex.Message);
-                        Registers[ni.Destination] = new object();
+                        Registers[ni.Destination] = new DalvikObject("java.lang.Object");
                     }
                     break;
 
@@ -452,12 +523,84 @@ namespace DalvikUWPCSharp.Classes
                     {
                         int size = ToInt(Registers[na.Size]);
                         Registers[na.Destination] = new object[Math.Max(0, size)];
-                        Debug.WriteLine("[DalvikCPU] new-array size=" + size);
+#if DEBUG
+                        TraceInstruction("new-array size=" + size);
+#endif
                     }
                     catch (Exception ex)
                     {
                         Debug.WriteLine("[DalvikCPU] new-array error: " + ex.Message);
                         Registers[na.Destination] = new object[0];
+                    }
+                    break;
+
+                // ── FILLED-NEW-ARRAY ────────────────────────────────────────
+                case Instructions.FilledNewArrayOf:
+                    var fna = (FilledNewArrayOpCode)op;
+                    try
+                    {
+                        // fna.Values contains the register indices that hold the element values
+                        byte[] regIndices = fna.Values;
+                        object[] filledArr = new object[regIndices != null ? regIndices.Length : 0];
+                        for (int i = 0; i < filledArr.Length; i++)
+                        {
+                            int rIdx = regIndices[i];
+                            filledArr[i] = rIdx < Registers.Length ? Registers[rIdx] : null;
+                        }
+                        result = filledArr;
+#if DEBUG
+                        TraceInstruction("filled-new-array len=" + filledArr.Length);
+#endif
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] filled-new-array error: " + ex.Message);
+                        result = new object[0];
+                    }
+                    break;
+
+                // ── FILLED-NEW-ARRAY/RANGE ──────────────────────────────────
+                case Instructions.FilledNewArrayRange:
+                    var fnar = (FilledNewArrayRangeOpCode)op;
+                    try
+                    {
+                        ushort[] fnarRegs = fnar.Values;
+                        object[] filledRangeArr = new object[fnarRegs != null ? fnarRegs.Length : 0];
+                        for (int i = 0; i < filledRangeArr.Length; i++)
+                        {
+                            int rIdx = fnarRegs[i];
+                            filledRangeArr[i] = rIdx < Registers.Length ? Registers[rIdx] : null;
+                        }
+                        result = filledRangeArr;
+#if DEBUG
+                        TraceInstruction("filled-new-array/range count=" + filledRangeArr.Length);
+#endif
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] filled-new-array/range error: " + ex.Message);
+                        result = new object[0];
+                    }
+                    break;
+
+                // ── FILL-ARRAY-DATA ─────────────────────────────────────────
+                case Instructions.FillArrayData:
+                    var fad = (FillArrayDataOpCode)op;
+                    try
+                    {
+                        var arrRef = Registers[fad.Destination] as object[];
+                        if (arrRef != null && fad.Values != null)
+                        {
+                            for (int i = 0; i < fad.Values.Length && i < arrRef.Length; i++)
+                                arrRef[i] = fad.Values[i];
+                        }
+#if DEBUG
+                        TraceInstruction("fill-array-data len=" + (fad.Values?.Length ?? 0));
+#endif
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[DalvikCPU] fill-array-data error: " + ex.Message);
                     }
                     break;
 
@@ -1129,16 +1272,21 @@ namespace DalvikUWPCSharp.Classes
                     break;
 
                 default:
-                    Debug.WriteLine("[DalvikCPU] Unhandled instruction: " + op.Instruction);
+#if DEBUG
+                    TraceInstruction("Unhandled instruction: " + op.Instruction + " at offset 0x" + op.OpCodeOffset.ToString("X"));
+#endif
                     break;
             }
 
             return ExecutionSignals.CONTINUE;
         }
 
-        // TryNativeMethod
+        // TryNativeMethod — intercepts calls to known Android framework methods.
+        // Returns true if the method was handled, false if the caller should fall through
+        // to DEX bytecode execution.
         private bool TryNativeMethod(Method m, Class c, params object[] obj)
         {
+            // ── setContentView ───────────────────────────────────────────
             if (m.Name.Contains("setContentView"))
             {
                 try
@@ -1156,10 +1304,6 @@ namespace DalvikUWPCSharp.Classes
                     }
                     else if (arg0 is DalvikObject dalvikView)
                     {
-                        // Native type (e.g. GLSurfaceView) with no managed equivalent.
-                        // TryNativeMethod is always called on the UI thread (Start() is called from
-                        // the UI thread and never truly yields before running bytecode), so we can
-                        // access UI elements directly here.
                         Debug.WriteLine("[DalvikCPU] setContentView(DalvikObject=" + dalvikView.TypeName + ") - creating native render surface.");
                         var surface = new AndroidRenderSurface();
                         surface.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -1168,7 +1312,6 @@ namespace DalvikUWPCSharp.Classes
                     }
                     else if (arg0 != null)
                     {
-                        // Try to cast to int for resource ID passed as object
                         Debug.WriteLine("[DalvikCPU] setContentView(arg=" + arg0.GetType().Name + " value=" + arg0 + ")");
                         int resId = ToInt(arg0);
                         if (resId != 0)
@@ -1186,11 +1329,401 @@ namespace DalvikUWPCSharp.Classes
                 return true;
             }
 
-            string className = ConvertClassName(c.Name);
-            if (className.StartsWith(packageName))
+            // ── Resolve the class name for further dispatch ──────────────
+            string className;
+            try { className = dex.GetTypeName(m.ClassIndex); }
+            catch { className = c.Name; }
+
+            string fullMethodKey = className + "." + m.Name;
+
+            // ── getString(int) — return string resource by ID ────────────
+            if (m.Name == "getString")
+            {
+                int resId = obj != null && obj.Length > 0 ? ToInt(obj[0]) : 0;
+                if (stringResources.TryGetValue(resId, out string strVal))
+                    result = strVal;
+                else
+                    result = "res_" + resId;
+#if DEBUG
+                TraceInstruction($"getString({resId}) => \"{result}\"");
+#endif
+                return true;
+            }
+
+            // ── getResources() — return a stub resources object ──────────
+            if (m.Name == "getResources")
+            {
+                result = new DalvikObject("android.content.res.Resources");
+#if DEBUG
+                TraceInstruction("getResources() => stub Resources");
+#endif
+                return true;
+            }
+
+            // ── getApplicationContext() — return our context proxy ────────
+            if (m.Name == "getApplicationContext" || m.Name == "getBaseContext")
+            {
+                result = appContext ?? (object)new DalvikObject("android.content.Context");
+#if DEBUG
+                TraceInstruction(m.Name + "() => appContext");
+#endif
+                return true;
+            }
+
+            // ── getPackageName() ─────────────────────────────────────────
+            if (m.Name == "getPackageName")
+            {
+                result = packageName;
+                return true;
+            }
+
+            // ── getWindowManager() ───────────────────────────────────────
+            if (m.Name == "getWindowManager")
+            {
+                result = new DalvikObject("android.view.WindowManager");
+                return true;
+            }
+
+            // ── getWindow() ──────────────────────────────────────────────
+            if (m.Name == "getWindow")
+            {
+                result = droidWindow ?? (object)new DalvikObject("android.view.Window");
+                return true;
+            }
+
+            // ── getSystemService(String) ─────────────────────────────────
+            if (m.Name == "getSystemService")
+            {
+                string service = obj != null && obj.Length > 0 ? obj[0] as string ?? "" : "";
+#if DEBUG
+                TraceInstruction("getSystemService(\"" + service + "\")");
+#endif
+                result = new DalvikObject("android.os." + service);
+                return true;
+            }
+
+            // ── getAssets() ──────────────────────────────────────────────
+            if (m.Name == "getAssets")
+            {
+                result = new DalvikObject("android.content.res.AssetManager");
+                return true;
+            }
+
+            // ── getFilesDir() / getCacheDir() / getExternalFilesDir() ────
+            if (m.Name == "getFilesDir" || m.Name == "getCacheDir" || m.Name == "getExternalFilesDir" ||
+                m.Name == "getExternalCacheDir" || m.Name == "getCodeCacheDir" || m.Name == "getNoBackupFilesDir" ||
+                m.Name == "getDataDir")
+            {
+                string path = da.localAppRoot != null ? da.localAppRoot.Path : "/data/data/" + packageName;
+                result = new DalvikObject("java.io.File");
+                SetInstanceField(result, "path", path);
+#if DEBUG
+                TraceInstruction(m.Name + "() => " + path);
+#endif
+                return true;
+            }
+
+            // ── getApplicationInfo() ─────────────────────────────────────
+            if (m.Name == "getApplicationInfo")
+            {
+                var appInfo = new DalvikObject("android.content.pm.ApplicationInfo");
+                string dataDir = da.localAppRoot != null ? da.localAppRoot.Path : "/data/data/" + packageName;
+                SetInstanceField(appInfo, "dataDir", dataDir);
+                SetInstanceField(appInfo, "nativeLibraryDir", dataDir + "/lib");
+                SetInstanceField(appInfo, "sourceDir", dataDir + "/base.apk");
+                SetInstanceField(appInfo, "packageName", packageName);
+                SetInstanceField(appInfo, "targetSdkVersion", 28);
+                SetInstanceField(appInfo, "flags", 0);
+                result = appInfo;
+                return true;
+            }
+
+            // ── getPackageManager() ──────────────────────────────────────
+            if (m.Name == "getPackageManager")
+            {
+                result = new DalvikObject("android.content.pm.PackageManager");
+                return true;
+            }
+
+            // ── getSharedPreferences(String, int) ────────────────────────
+            if (m.Name == "getSharedPreferences")
+            {
+                string name = obj != null && obj.Length > 0 ? obj[0] as string ?? "prefs" : "prefs";
+                result = new DalvikObject("android.content.SharedPreferences");
+#if DEBUG
+                TraceInstruction("getSharedPreferences(\"" + name + "\")");
+#endif
+                return true;
+            }
+
+            // ── getClassLoader() ─────────────────────────────────────────
+            if (m.Name == "getClassLoader")
+            {
+                result = new DalvikObject("java.lang.ClassLoader");
+                return true;
+            }
+
+            // ── getContentResolver() ─────────────────────────────────────
+            if (m.Name == "getContentResolver")
+            {
+                result = new DalvikObject("android.content.ContentResolver");
+                return true;
+            }
+
+            // ── Activity lifecycle stubs ─────────────────────────────────
+            if (m.Name == "finish")
+            {
+                Debug.WriteLine("[DalvikCPU] Activity.finish() called");
+                return true;
+            }
+            if (m.Name == "runOnUiThread")
+            {
+                Debug.WriteLine("[DalvikCPU] runOnUiThread (stub - sync execution)");
+                return true;
+            }
+
+            // ── Resources methods ────────────────────────────────────────
+            if (m.Name == "getDisplayMetrics")
+            {
+                var dm = new DalvikObject("android.util.DisplayMetrics");
+                SetInstanceField(dm, "widthPixels", 1280);
+                SetInstanceField(dm, "heightPixels", 720);
+                SetInstanceField(dm, "density", 1.0f);
+                SetInstanceField(dm, "densityDpi", 160);
+                SetInstanceField(dm, "scaledDensity", 1.0f);
+                SetInstanceField(dm, "xdpi", 160.0f);
+                SetInstanceField(dm, "ydpi", 160.0f);
+                result = dm;
+                return true;
+            }
+
+            if (m.Name == "getConfiguration")
+            {
+                result = new DalvikObject("android.content.res.Configuration");
+                return true;
+            }
+
+            // ── Display methods ──────────────────────────────────────────
+            if (m.Name == "getDefaultDisplay")
+            {
+                var display = new DalvikObject("android.view.Display");
+                SetInstanceField(display, "width", 1280);
+                SetInstanceField(display, "height", 720);
+                result = display;
+                return true;
+            }
+            if (m.Name == "getMetrics" && obj != null && obj.Length > 0)
+            {
+                // Populate the DisplayMetrics parameter
+                object dmObj = obj[0];
+                if (dmObj != null)
+                {
+                    SetInstanceField(dmObj, "widthPixels", 1280);
+                    SetInstanceField(dmObj, "heightPixels", 720);
+                    SetInstanceField(dmObj, "density", 1.0f);
+                    SetInstanceField(dmObj, "densityDpi", 160);
+                    SetInstanceField(dmObj, "scaledDensity", 1.0f);
+                    SetInstanceField(dmObj, "xdpi", 160.0f);
+                    SetInstanceField(dmObj, "ydpi", 160.0f);
+                }
+                return true;
+            }
+            if (m.Name == "getWidth" || m.Name == "getHeight")
+            {
+                // Display or View dimension queries
+                result = m.Name == "getWidth" ? (object)1280 : (object)720;
+                return true;
+            }
+            if (m.Name == "getRotation")
+            {
+                result = 0; // ROTATION_0
+                return true;
+            }
+
+            // ── Window methods ───────────────────────────────────────────
+            if (m.Name == "getDecorView")
+            {
+                result = new DalvikObject("android.view.View");
+                return true;
+            }
+            if (m.Name == "setFlags" || m.Name == "addFlags" || m.Name == "clearFlags")
+            {
+#if DEBUG
+                TraceInstruction("Window." + m.Name + " (stub)");
+#endif
+                return true;
+            }
+            if (m.Name == "setFormat")
+            {
+                return true; // stub: pixel format
+            }
+            if (m.Name == "requestWindowFeature" || m.Name == "requestFeature")
+            {
+                result = true;
+                return true;
+            }
+
+            // ── View/ViewGroup methods ───────────────────────────────────
+            if (m.Name == "addView" || m.Name == "removeView" || m.Name == "removeAllViews")
+            {
+#if DEBUG
+                TraceInstruction("ViewGroup." + m.Name + " (stub)");
+#endif
+                return true;
+            }
+            if (m.Name == "setVisibility" || m.Name == "setEnabled" || m.Name == "setClickable" ||
+                m.Name == "setFocusable" || m.Name == "setFocusableInTouchMode")
+            {
+                return true; // View property stubs
+            }
+            if (m.Name == "setLayoutParams" || m.Name == "getLayoutParams")
+            {
+                if (m.Name == "getLayoutParams")
+                    result = new DalvikObject("android.view.ViewGroup$LayoutParams");
+                return true;
+            }
+            if (m.Name == "setId" || m.Name == "getId")
+            {
+                if (m.Name == "getId")
+                    result = 0;
+                return true;
+            }
+            if (m.Name == "setBackgroundColor" || m.Name == "setBackgroundResource" || m.Name == "setBackground")
+            {
+                return true;
+            }
+
+            // ── GLSurfaceView methods ────────────────────────────────────
+            if (m.Name == "setRenderer")
+            {
+                Debug.WriteLine("[DalvikCPU] GLSurfaceView.setRenderer called");
+                return true;
+            }
+            if (m.Name == "setEGLContextClientVersion")
+            {
+#if DEBUG
+                int ver = obj != null && obj.Length > 0 ? ToInt(obj[0]) : 0;
+                TraceInstruction("GLSurfaceView.setEGLContextClientVersion(" + ver + ")");
+#endif
+                return true;
+            }
+            if (m.Name == "setEGLConfigChooser" || m.Name == "setPreserveEGLContextOnPause" ||
+                m.Name == "setRenderMode")
+            {
+                return true;
+            }
+            if (m.Name == "requestRender" || m.Name == "queueEvent")
+            {
+                return true;
+            }
+
+            // ── Audio stubs ──────────────────────────────────────────────
+            if (m.Name == "getMinBufferSize" || m.Name == "getMaxVolume" || m.Name == "getStreamVolume")
+            {
+                result = 4096; // reasonable default buffer/volume
+                return true;
+            }
+
+            // ── System.loadLibrary (already handled by JNI but intercept for safety)
+            if (m.Name == "loadLibrary")
+            {
+                string libName = obj != null && obj.Length > 0 ? obj[0] as string ?? "" : "";
+                Debug.WriteLine("[DalvikCPU] System.loadLibrary(\"" + libName + "\") - stub");
+                return true;
+            }
+
+            // ── Log methods ──────────────────────────────────────────────
+            if (className != null && className.Contains("android.util.Log"))
+            {
+                string tag = obj != null && obj.Length > 0 ? obj[0] as string ?? "" : "";
+                string msg = obj != null && obj.Length > 1 ? obj[1] as string ?? "" : "";
+                Debug.WriteLine("[Android.Log." + m.Name + "] " + tag + ": " + msg);
+                result = 0;
+                return true;
+            }
+
+            // ── StringBuilder methods ────────────────────────────────────
+            if (className != null && className.Contains("StringBuilder"))
+            {
+                if (m.Name == "append" || m.Name == "toString" || m.Name == "<init>")
+                    return false; // let DEX handle via DalvikObject fields
+            }
+
+            // ── SharedPreferences stubs ──────────────────────────────────
+            if (m.Name == "edit")
+            {
+                if (className != null && className.Contains("SharedPreferences"))
+                {
+                    result = new DalvikObject("android.content.SharedPreferences$Editor");
+                    return true;
+                }
+            }
+            if (m.Name == "putString" || m.Name == "putInt" || m.Name == "putBoolean" ||
+                m.Name == "putFloat" || m.Name == "putLong" || m.Name == "putStringSet")
+            {
+                // SharedPreferences.Editor methods — return self for chaining
+                if (obj != null && obj.Length > 0)
+                    result = obj[0]; // 'this' reference
+                else
+                    result = new DalvikObject("android.content.SharedPreferences$Editor");
+                return true;
+            }
+            if (m.Name == "commit" || m.Name == "apply")
+            {
+                result = true;
+                return true;
+            }
+            if (m.Name == "getBoolean") { result = false; return true; }
+            if (m.Name == "getInt") { result = 0; return true; }
+            if (m.Name == "getFloat") { result = 0.0f; return true; }
+            if (m.Name == "getLong") { result = 0L; return true; }
+
+            // ── java.io.File methods ─────────────────────────────────────
+            if (m.Name == "getAbsolutePath" || m.Name == "getPath" || m.Name == "toString")
+            {
+                if (className != null && className.Contains("java.io.File"))
+                {
+                    result = GetInstanceField(obj != null && obj.Length > 0 ? obj[0] : null, "path") ?? "/data/data/" + packageName;
+                    return true;
+                }
+            }
+            if (m.Name == "exists" || m.Name == "isDirectory" || m.Name == "isFile")
+            {
+                if (className != null && className.Contains("java.io.File"))
+                {
+                    result = true;
+                    return true;
+                }
+            }
+            if (m.Name == "mkdirs" || m.Name == "mkdir")
+            {
+                if (className != null && className.Contains("java.io.File"))
+                {
+                    result = true;
+                    return true;
+                }
+            }
+
+            // ── onCreate/onResume/onPause lifecycle stubs ────────────────
+            if (m.Name == "onResume" || m.Name == "onPause" || m.Name == "onDestroy" ||
+                m.Name == "onStop" || m.Name == "onStart" || m.Name == "onRestart")
+            {
+                // Activity lifecycle methods on framework classes — stub them
+                if (className != null && !className.StartsWith(packageName))
+                {
+#if DEBUG
+                    TraceInstruction("Lifecycle stub: " + fullMethodKey);
+#endif
+                    return true;
+                }
+            }
+
+            // ── Fallback to managed reflection (existing logic) ──────────
+            string convertedName = ConvertClassName(c.Name);
+            if (convertedName.StartsWith(packageName))
                 return false;
 
-            Type myType = Type.GetType("AndroidInteropLib." + className);
+            Type myType = Type.GetType("AndroidInteropLib." + convertedName);
             if (myType != null)
             {
                 TypeInfo info = myType.GetTypeInfo();
@@ -1207,6 +1740,17 @@ namespace DalvikUWPCSharp.Classes
                         return false;
                     }
                 }
+            }
+
+            // ── Constructor calls (<init>) on framework classes ──────────
+            // If a constructor is called on a DalvikObject for a known framework class,
+            // just return true to avoid crashing on missing DEX code for the constructor.
+            if (m.Name == "<init>" && className != null && !className.StartsWith(packageName))
+            {
+#if DEBUG
+                TraceInstruction("Constructor stub: " + className + ".<init>");
+#endif
+                return true;
             }
 
             return false;
@@ -1231,15 +1775,20 @@ namespace DalvikUWPCSharp.Classes
                     args[i - 1] = regIdx < Registers.Length ? Registers[regIdx] : null;
                 }
 
+#if DEBUG
                 string invokeTypeName;
                 try { invokeTypeName = dex.GetTypeName(m.ClassIndex); } catch { invokeTypeName = "(unknown)"; }
-                Debug.WriteLine("[DalvikCPU] " + invokeOp.Instruction + " " + invokeTypeName + "." + m.Name + " args=" + args.Length);
+                TraceInstruction(invokeOp.Instruction + " " + invokeTypeName + "." + m.Name + " args=" + args.Length);
+#endif
                 if (!TryNativeMethod(m, cl, args))
                     result = RunMethod(m, cl, args);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine("[DalvikCPU] " + invokeOp.Instruction + " exception: " + ex.Message);
+#if DEBUG
+                Debug.WriteLine("[DalvikCPU]   Stack: " + ex.StackTrace);
+#endif
             }
         }
 
@@ -1256,9 +1805,11 @@ namespace DalvikUWPCSharp.Classes
                     args[i] = regIdx < Registers.Length ? Registers[regIdx] : null;
                 }
 
+#if DEBUG
                 string rangeTypeName;
                 try { rangeTypeName = dex.GetTypeName(m.ClassIndex); } catch { rangeTypeName = "(unknown)"; }
-                Debug.WriteLine("[DalvikCPU] invoke-range " + rangeTypeName + "." + m.Name + " args=" + count);
+                TraceInstruction("invoke-range " + rangeTypeName + "." + m.Name + " args=" + count);
+#endif
 
                 if (!TryNativeMethod(m, cl, args))
                     result = RunMethod(m, cl, args);
@@ -1266,6 +1817,9 @@ namespace DalvikUWPCSharp.Classes
             catch (Exception ex)
             {
                 Debug.WriteLine("[DalvikCPU] invoke-range exception: " + ex.Message);
+#if DEBUG
+                Debug.WriteLine("[DalvikCPU]   Stack: " + ex.StackTrace);
+#endif
             }
         }
 
@@ -1426,7 +1980,14 @@ namespace DalvikUWPCSharp.Classes
             int id = GetObjectId(obj);
             if (id == 0) return null;
 
-            // Try managed .NET reflection first
+            // DalvikObject has its own property storage — check that first
+            if (obj is DalvikObject dobj)
+            {
+                if (dobj.Properties.TryGetValue(fieldName, out object dVal))
+                    return dVal;
+            }
+
+            // Try managed .NET reflection
             if (obj != null && !(obj is DalvikObject))
             {
                 try
@@ -1450,8 +2011,15 @@ namespace DalvikUWPCSharp.Classes
             int id = GetObjectId(obj);
             if (id == 0) return;
 
-            // Try managed .NET reflection first
-            if (obj != null && !(obj is DalvikObject))
+            // DalvikObject has its own property storage — use it directly
+            if (obj is DalvikObject dobj)
+            {
+                dobj.Properties[fieldName] = value;
+                return;
+            }
+
+            // Try managed .NET reflection
+            if (obj != null)
             {
                 try
                 {
@@ -1567,10 +2135,17 @@ namespace DalvikUWPCSharp.Classes
 
     }
 
-    // Minimal heap-allocated object to represent a Dalvik class instance when no managed type exists
+    // Minimal heap-allocated object to represent a Dalvik class instance when no managed type exists.
+    // Carries its own property bag so field get/set operations on framework stubs work correctly.
     public class DalvikObject
     {
         public string TypeName { get; }
+
+        /// <summary>
+        /// Per-instance property storage for iget/iput operations when no managed .NET field exists.
+        /// </summary>
+        public Dictionary<string, object> Properties { get; } = new Dictionary<string, object>();
+
         public DalvikObject(string typeName) { TypeName = typeName; }
         public override string ToString() => "[DalvikObject: " + TypeName + "]";
     }

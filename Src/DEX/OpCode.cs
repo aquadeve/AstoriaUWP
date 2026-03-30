@@ -671,8 +671,8 @@ namespace dex.net
 	/// </summary>
 	public class FilledNewArrayOfOpCode : OpCode
 	{
-		internal byte[] Values;
-		internal ushort TypeIndex;
+		public byte[] Values;
+		public ushort TypeIndex;
 		
 		internal FilledNewArrayOfOpCode (BinaryReader reader) : base ("filled-new-array", Instructions.FilledNewArrayOf)
 		{
@@ -721,8 +721,8 @@ namespace dex.net
 	/// </summary>
 	public class FilledNewArrayRangeOpCode : OpCode
 	{
-		internal ushort TypeIndex;
-		internal ushort[] Values;
+		public ushort TypeIndex;
+		public ushort[] Values;
 		
 		internal FilledNewArrayRangeOpCode (BinaryReader reader) : base ("filled-new-array/range", Instructions.FilledNewArrayRange)
 		{
@@ -750,9 +750,9 @@ namespace dex.net
 	/// </summary>
 	public class FillArrayDataOpCode : Register8OpCode, DataExtendedOpCode
 	{
-		internal ushort TypeIndex;
-		internal ulong[] Values;
-		protected ushort ValueWidth;
+		public ushort TypeIndex;
+		public ulong[] Values;
+		public ushort ValueWidth;
 
 		public long DataTableOffset { get; private set; }
 
