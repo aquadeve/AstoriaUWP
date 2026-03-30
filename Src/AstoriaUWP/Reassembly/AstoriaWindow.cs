@@ -36,7 +36,7 @@ namespace DalvikUWPCSharp.Reassembly
             int windowBackRef = (int)(mContext.getR().color.get("windowBackground") ?? -1);
             if (windowBackRef != -1)
             {
-                List<string> res = ((AstoriaContext)mContext).runningApp.metadata.resStrings["@" + statusBarRef.ToString("X")];
+                List<string> res = ((AstoriaContext)mContext).runningApp.metadata.resStrings["@" + windowBackRef.ToString("X")];
                 int color = (int.Parse(res[0]));
 
                 Windows.UI.Color winColor = AndroidInteropLib.ticomware.interop.Util.IntToColor(color);

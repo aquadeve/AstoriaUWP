@@ -14,12 +14,24 @@ namespace DalvikUWPCSharp.Reassembly
     public class AstoriaXmlParser : XmlResourceParser
     {
         private XmlReader doc;
+        // Keep a reference to the underlying MemoryStream so it can be properly
+        // disposed when close() is called (the XmlReader holds it open for lazy reads).
+        private System.IO.Stream underlyingStream;
 
         public AstoriaXmlParser(XmlReader docx)
         {
             doc = docx;
             //doc.MoveToElement();
             //doc.MoveToContent();
+        }
+
+        /// <summary>
+        /// Constructor that also takes ownership of the underlying stream, so that
+        /// close() can dispose both the XmlReader and the stream.
+        /// </summary>
+        public AstoriaXmlParser(XmlReader docx, System.IO.Stream stream) : this(docx)
+        {
+            underlyingStream = stream;
         }
 
         public override void setFeature(string name, bool state)
@@ -278,7 +290,8 @@ namespace DalvikUWPCSharp.Reassembly
 
         public override void close()
         {
-            //doc.Dispose();
+            doc?.Dispose();
+            underlyingStream?.Dispose();
         }
     }
 }

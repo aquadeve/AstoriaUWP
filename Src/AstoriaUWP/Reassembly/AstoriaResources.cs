@@ -114,17 +114,15 @@ namespace DalvikUWPCSharp.Reassembly
             List<string> res = currentApp.metadata.resStrings["@" + id.ToString("X")];
 
             string fileName = res[0];
-            //string fileName = currentApp.context.getR().layout.get(id).ToString();
             byte[] xmlfile = files[fileName];
-            //byte[] xmlfile = files[((currentApp.metadata.resStrings["@" + id.ToString("X")])[0])];
 
-            using (MemoryStream ms = new MemoryStream(xmlfile))
-            {
-                //AndroidXml.AndroidXmlReader axr = new AndroidXml.AndroidXmlReader(ms);
-                //XDocument axr = XDocument.Parse(System.Text.Encoding.UTF8.GetString(xmlfile));
-                XmlReader axr = XmlReader.Create(ms);
-                return new AstoriaXmlParser(axr);
-            }
+            // Do NOT wrap in a using block: the MemoryStream must remain open while
+            // AstoriaXmlParser / XmlReader lazily reads from it.
+            // Ownership is transferred to AstoriaXmlParser, which disposes both
+            // the XmlReader and the stream in its close() method.
+            MemoryStream ms = new MemoryStream(xmlfile);
+            XmlReader axr = XmlReader.Create(ms);
+            return new AstoriaXmlParser(axr, ms);
         }//getLayout
 
 
