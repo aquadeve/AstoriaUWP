@@ -585,9 +585,7 @@ namespace DalvikUWPCSharp.Classes
                     // GL_COLOR_BUFFER_BIT = 0x00004000
                     if (args.Length > 0 && (args[0].I & 0x00004000) != 0)
                     {
-                        var surface = DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current;
-                        if (surface != null)
-                            surface.GLClear();
+                        DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current?.GLClear();
                     }
                     return JniValue.Void();
                 });
@@ -596,9 +594,8 @@ namespace DalvikUWPCSharp.Classes
                 {
                     if (args.Length >= 4)
                     {
-                        var surface = DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current;
-                        if (surface != null)
-                            surface.SetGLClearColor(args[0].F, args[1].F, args[2].F, args[3].F);
+                        DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current?.SetGLClearColor(
+                            args[0].F, args[1].F, args[2].F, args[3].F);
                     }
                     return JniValue.Void();
                 });

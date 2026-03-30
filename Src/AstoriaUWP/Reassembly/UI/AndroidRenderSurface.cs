@@ -96,9 +96,20 @@ namespace DalvikUWPCSharp.Reassembly.UI
             {
                 _ = uiDispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
-                    renderCanvas.Children.Clear();
-                    renderCanvas.Background = new SolidColorBrush(color);
+                    try
+                    {
+                        renderCanvas.Children.Clear();
+                        renderCanvas.Background = new SolidColorBrush(color);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[AndroidRenderSurface] GLClear dispatch error: " + ex.Message);
+                    }
                 });
+            }
+            else
+            {
+                Debug.WriteLine("[AndroidRenderSurface] GLClear skipped – no UI dispatcher available.");
             }
         }
 
