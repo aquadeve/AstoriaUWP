@@ -128,13 +128,10 @@ namespace DalvikUWPCSharp.Classes
             {
                 // Cache all DEX strings keyed by their index – this provides a best-effort
                 // mapping for getString(int) where the int is a string-table index.
-                int count = 0;
-                try { foreach (string s in dex.GetStrings()) count++; } catch { }
                 int idx = 0;
                 foreach (string s in dex.GetStrings())
                 {
-                    try { stringResources[idx] = s; }
-                    catch { /* skip */ }
+                    stringResources[idx] = s;
                     idx++;
                 }
 #if DEBUG
@@ -1673,10 +1670,26 @@ namespace DalvikUWPCSharp.Classes
                 result = true;
                 return true;
             }
-            if (m.Name == "getBoolean") { result = false; return true; }
-            if (m.Name == "getInt") { result = 0; return true; }
-            if (m.Name == "getFloat") { result = 0.0f; return true; }
-            if (m.Name == "getLong") { result = 0L; return true; }
+            if (m.Name == "getBoolean")
+            {
+                result = false;
+                return true;
+            }
+            if (m.Name == "getInt")
+            {
+                result = 0;
+                return true;
+            }
+            if (m.Name == "getFloat")
+            {
+                result = 0.0f;
+                return true;
+            }
+            if (m.Name == "getLong")
+            {
+                result = 0L;
+                return true;
+            }
 
             // ── java.io.File methods ─────────────────────────────────────
             if (m.Name == "getAbsolutePath" || m.Name == "getPath" || m.Name == "toString")
@@ -1719,11 +1732,13 @@ namespace DalvikUWPCSharp.Classes
             }
 
             // ── Fallback to managed reflection (existing logic) ──────────
-            string convertedName = ConvertClassName(c.Name);
-            if (convertedName.StartsWith(packageName))
+            // Use the DEX-resolved className first; fall back to the class name
+            // from the Class object if the DEX lookup returned something different.
+            string reflectionClassName = ConvertClassName(className ?? c.Name);
+            if (reflectionClassName.StartsWith(packageName))
                 return false;
 
-            Type myType = Type.GetType("AndroidInteropLib." + convertedName);
+            Type myType = Type.GetType("AndroidInteropLib." + reflectionClassName);
             if (myType != null)
             {
                 TypeInfo info = myType.GetTypeInfo();

@@ -168,7 +168,7 @@ namespace DalvikUWPCSharp.Classes
             Debug.WriteLine("[JNI] FindClass failed: " + jniClassName);
 #endif
             // Return a placeholder so native code doesn't crash on null class
-            return NewLocalRef(dotName);
+            return NewLocalRef(new DalvikClassRef(dotName));
         }
 
         /// <summary>
@@ -203,6 +203,18 @@ namespace DalvikUWPCSharp.Classes
         /// Returns the number of registered native methods (useful for diagnostics).
         /// </summary>
         public int RegisteredMethodCount => registeredMethods.Count;
+    }
+
+    /// <summary>
+    /// Placeholder for a JNI class reference when no managed Type is found.
+    /// Used by FindClass to return a non-null reference that won't be
+    /// misinterpreted as a string or other value.
+    /// </summary>
+    public sealed class DalvikClassRef
+    {
+        public string ClassName { get; }
+        public DalvikClassRef(string className) { ClassName = className; }
+        public override string ToString() => "[ClassRef: " + ClassName + "]";
     }
 
     /// <summary>
