@@ -533,7 +533,7 @@ namespace DalvikUWPCSharp.Classes
 
                 // ── FILLED-NEW-ARRAY ────────────────────────────────────────
                 case Instructions.FilledNewArrayOf:
-                    var fna = (FilledNewArrayOpCode)op;
+                    var fna = (FilledNewArrayOfOpCode)op;
                     try
                     {
                         // fna.Values contains the register indices that hold the element values
