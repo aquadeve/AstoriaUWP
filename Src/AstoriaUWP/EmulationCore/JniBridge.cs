@@ -580,9 +580,28 @@ namespace DalvikUWPCSharp.Classes
             // Reference: android.opengl.GLES20 from android-7.0.0_r1
             // frameworks/base/opengl/java/android/opengl/GLES20.java
             env.RegisterNativeMethod("android.opengl.GLES20", "glClear", "(I)V",
-                (jniEnv, thisObj, args) => JniValue.Void());
+                (jniEnv, thisObj, args) =>
+                {
+                    // GL_COLOR_BUFFER_BIT = 0x00004000
+                    if (args.Length > 0 && (args[0].I & 0x00004000) != 0)
+                    {
+                        var surface = DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current;
+                        if (surface != null)
+                            surface.GLClear();
+                    }
+                    return JniValue.Void();
+                });
             env.RegisterNativeMethod("android.opengl.GLES20", "glClearColor", "(FFFF)V",
-                (jniEnv, thisObj, args) => JniValue.Void());
+                (jniEnv, thisObj, args) =>
+                {
+                    if (args.Length >= 4)
+                    {
+                        var surface = DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current;
+                        if (surface != null)
+                            surface.SetGLClearColor(args[0].F, args[1].F, args[2].F, args[3].F);
+                    }
+                    return JniValue.Void();
+                });
             env.RegisterNativeMethod("android.opengl.GLES20", "glViewport", "(IIII)V",
                 (jniEnv, thisObj, args) =>
                 {

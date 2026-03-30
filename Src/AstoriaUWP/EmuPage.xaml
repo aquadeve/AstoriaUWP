@@ -116,7 +116,7 @@
         <!--<Viewbox x:Name="RenderTargetBox" Stretch="Uniform"/>-->
         <Viewbox x:Name="RenderTargetBox" Stretch="Uniform"/>
 
-        <Grid x:Name="RenderTargetGrid" Background="Blue"/>
+        <Grid x:Name="RenderTargetGrid" Background="Transparent"/>
         <Grid x:Name="PreSplashGrid" Background="{ThemeResource SystemControlPageBackgroundChromeLowBrush}">
             <Grid Height="400">
                 <Image x:Name="appImage" HorizontalAlignment="Center" Height="100" VerticalAlignment="Top" Width="100" Margin="0" Source="Assets/Square150x150Logo.png"/>
