@@ -3,6 +3,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Windows.ApplicationModel.Core;
@@ -39,6 +40,7 @@ namespace DalvikUWPCSharp
         private Renderer UIRenderer; // 
 
         private DalvikCPU cpu; //
+        private int pendingRenderTargetUpdates;
 
         /// <summary>
         /// CPU execution mode selected by the user via the nav-bar ComboBox.
@@ -160,62 +162,70 @@ namespace DalvikUWPCSharp
             }
         }
 
-        private void RunOnRenderThread(Action action)
+        private void ReplaceRenderTargetOnUIThread(UIElement element)
         {
-            var dispatcher = GetRenderDispatcher();
-            if (dispatcher == null || dispatcher.HasThreadAccess)
+            if (element == null)
             {
-                action();
+                Debug.WriteLine("[EmuPage] [Render] Ignoring null render target content.");
                 return;
             }
 
-            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => action())
-                .AsTask()
-                .GetAwaiter()
-                .GetResult();
+            var dispatcher = GetRenderDispatcher();
+            if (dispatcher == null || dispatcher.HasThreadAccess)
+            {
+                RenderTargetGrid.Children.Clear();
+                RenderTargetGrid.Children.Add(element);
+                return;
+            }
+
+            Interlocked.Increment(ref pendingRenderTargetUpdates);
+            _ = dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                try
+                {
+                    RenderTargetGrid.Children.Clear();
+                    RenderTargetGrid.Children.Add(element);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[EmuPage] [Render] Render target replacement failed: " + ex.Message);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref pendingRenderTargetUpdates);
+                }
+            });
         }
 
-        private bool UpdateRenderTarget(UIElement element, bool replaceExisting)
+        private bool CanPopulateRenderTarget()
+        {
+            return RenderTargetGrid.Children.Count == 0 &&
+                Interlocked.CompareExchange(ref pendingRenderTargetUpdates, 0, 0) == 0;
+        }
+
+        private bool TryAddRenderTargetContent(UIElement element)
         {
             if (element == null)
                 return false;
 
-            bool updated = false;
-            RunOnRenderThread(() =>
-            {
-                if (replaceExisting)
-                {
-                    RenderTargetGrid.Children.Clear();
-                    RenderTargetGrid.Children.Add(element);
-                    updated = true;
-                }
-                else if (RenderTargetGrid.Children.Count == 0)
-                {
-                    RenderTargetGrid.Children.Add(element);
-                    updated = true;
-                }
-            });
+            if (!CanPopulateRenderTarget())
+                return false;
 
-            return updated;
+            RenderTargetGrid.Children.Add(element);
+            return true;
         }
 
         private bool TryCreateNativeRenderSurface()
         {
-            bool created = false;
-            RunOnRenderThread(() =>
-            {
-                if (RenderTargetGrid.Children.Count == 0)
-                {
-                    var surface = new DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface();
-                    surface.HorizontalAlignment = HorizontalAlignment.Stretch;
-                    surface.VerticalAlignment = VerticalAlignment.Stretch;
-                    DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = surface;
-                    RenderTargetGrid.Children.Add(surface);
-                    created = true;
-                }
-            });
+            if (!CanPopulateRenderTarget())
+                return false;
 
-            return created;
+            var surface = new DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface();
+            surface.HorizontalAlignment = HorizontalAlignment.Stretch;
+            surface.VerticalAlignment = VerticalAlignment.Stretch;
+            DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = surface;
+            RenderTargetGrid.Children.Add(surface);
+            return true;
         }
 
 
@@ -275,7 +285,7 @@ namespace DalvikUWPCSharp
                     {
                         // Only populate the grid from the fallback renderer if Start()/setContentView
                         // has not already set it up. If the grid is already populated we leave it alone.
-                        if (UpdateRenderTarget(renderedLayout, false))
+                        if (TryAddRenderTargetContent(renderedLayout))
                         {
                             Debug.WriteLine("[EmuPage] [Render] XML layout added to RenderTargetGrid.");
                         }
@@ -325,7 +335,19 @@ namespace DalvikUWPCSharp
         // SetContentView
         public void SetContentView(View v)
         {
-            UpdateRenderTarget(v?.WinUI, true);
+            if (v == null)
+            {
+                Debug.WriteLine("[EmuPage] [Render] Ignoring null Android view.");
+                return;
+            }
+
+            if (v.WinUI == null)
+            {
+                Debug.WriteLine("[EmuPage] [Render] Android view has no WinUI backing control: " + v.GetType().Name);
+                return;
+            }
+
+            ReplaceRenderTargetOnUIThread(v.WinUI);
         }//SetContentView end
 
 
@@ -336,7 +358,7 @@ namespace DalvikUWPCSharp
         {
             Debug.WriteLine("[EmuPage] SetNativeRenderSurface called.");
             DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = surface;
-            UpdateRenderTarget(surface, true);
+            ReplaceRenderTargetOnUIThread(surface);
         }//SetNativeRenderSurface end
 
 

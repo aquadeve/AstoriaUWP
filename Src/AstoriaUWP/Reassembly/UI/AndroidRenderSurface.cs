@@ -59,7 +59,7 @@ namespace DalvikUWPCSharp.Reassembly.UI
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine("[AndroidRenderSurface] Dispatcher resolution failed: " + ex.Message);
+                    Debug.WriteLine($"[AndroidRenderSurface] Dispatcher resolution failed ({ex.GetType().Name}): {ex.Message}");
                 }
             }
         }
