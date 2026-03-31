@@ -152,6 +152,45 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
                 case Arm32Syscalls.getrlimit:     return "getrlimit";
                 case Arm32Syscalls.madvise:       return "madvise";
                 case Arm32Syscalls.sysinfo:       return "sysinfo";
+                // Additional from ExAndroidNativeEmu
+                case Arm32Syscalls.fork:          return "fork";
+                case Arm32Syscalls.vfork:         return "vfork";
+                case Arm32Syscalls.execve:        return "execve";
+                case Arm32Syscalls.ptrace:        return "ptrace";
+                case Arm32Syscalls.kill:          return "kill";
+                case Arm32Syscalls.sigaction:     return "sigaction";
+                case Arm32Syscalls.sigaltstack:   return "sigaltstack";
+                case Arm32Syscalls.wait4:         return "wait4";
+                case Arm32Syscalls.clone:         return "clone";
+                case Arm32Syscalls.getuid32:      return "getuid";  // alias
+                case Arm32Syscalls.tgkill:        return "tgkill";
+                case Arm32Syscalls.tkill:         return "tkill";
+                case Arm32Syscalls.socket:        return "socket";
+                case Arm32Syscalls.bind:          return "bind";
+                case Arm32Syscalls.connect:       return "connect";
+                case Arm32Syscalls.setsockopt:    return "setsockopt";
+                case Arm32Syscalls.getcpu:        return "getcpu";
+                case Arm32Syscalls.dup3_arm32:    return "dup3";
+                case Arm32Syscalls.process_vm_readv: return "process_vm_readv";
+                case Arm32Syscalls.getrandom:     return "getrandom";
+                case Arm32Syscalls.ARM_cacheflush: return "ARM_cacheflush";
+                case Arm32Syscalls.ARM_set_tls:   return "ARM_set_tls";
+                // VFS syscalls from ExAndroidNativeEmu
+                case Arm32Syscalls.access:        return "access";
+                case Arm32Syscalls.unlink:        return "unlink";
+                case Arm32Syscalls.ioctl:         return "ioctl";
+                case Arm32Syscalls.writev:        return "writev";
+                case Arm32Syscalls.poll:          return "poll";
+                case Arm32Syscalls.getdents64:    return "getdents64";
+                case Arm32Syscalls.llseek:        return "llseek";
+                case Arm32Syscalls.fcntl64:       return "fcntl64";
+                case Arm32Syscalls.statfs64:      return "statfs64";
+                case Arm32Syscalls.mkdirat:       return "mkdirat";
+                case Arm32Syscalls.fstatat64:     return "fstatat";
+                case Arm32Syscalls.unlinkat:      return "unlinkat";
+                case Arm32Syscalls.readlinkat:    return "readlinkat";
+                case Arm32Syscalls.ppoll:         return "ppoll";
+                case Arm32Syscalls.faccessat:     return "faccessat";
                 default: return $"unknown_{n}";
             }
         }
@@ -196,6 +235,32 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
                 case Arm64Syscalls.getrlimit:     return "getrlimit";
                 case Arm64Syscalls.madvise:       return "madvise";
                 case Arm64Syscalls.sysinfo:       return "sysinfo";
+                // Additional from ExAndroidNativeEmu
+                case Arm64Syscalls.execve:        return "execve";
+                case Arm64Syscalls.ptrace:        return "ptrace";
+                case Arm64Syscalls.kill:          return "kill";
+                case Arm64Syscalls.sigaltstack:   return "sigaltstack";
+                case Arm64Syscalls.wait4:         return "wait4";
+                case Arm64Syscalls.clone:         return "clone";
+                case Arm64Syscalls.tgkill:        return "tgkill";
+                case Arm64Syscalls.tkill:         return "tkill";
+                case Arm64Syscalls.socket:        return "socket";
+                case Arm64Syscalls.bind:          return "bind";
+                case Arm64Syscalls.connect:       return "connect";
+                case Arm64Syscalls.setsockopt:    return "setsockopt";
+                case Arm64Syscalls.getcpu:        return "getcpu";
+                case Arm64Syscalls.process_vm_readv: return "process_vm_readv";
+                case Arm64Syscalls.getrandom:     return "getrandom";
+                // VFS syscalls from ExAndroidNativeEmu (ARM64)
+                case Arm64Syscalls.ioctl:         return "ioctl";
+                case Arm64Syscalls.writev:        return "writev";
+                case Arm64Syscalls.getdents64:    return "getdents64";
+                case Arm64Syscalls.statfs:        return "statfs";
+                case Arm64Syscalls.mkdirat:       return "mkdirat";
+                case Arm64Syscalls.unlinkat:      return "unlinkat";
+                case Arm64Syscalls.readlinkat:    return "readlinkat";
+                case Arm64Syscalls.faccessat:     return "faccessat";
+                case Arm64Syscalls.ppoll:         return "ppoll";
                 default: return $"unknown_{n}";
             }
         }
@@ -245,6 +310,33 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
                 case X64Syscalls.madvise:         return "madvise";
                 case X64Syscalls.sysinfo:         return "sysinfo";
                 case X64Syscalls.arch_prctl:      return "arch_prctl";
+                // Additional from ExAndroidNativeEmu
+                case X64Syscalls.ptrace:          return "ptrace";
+                case X64Syscalls.kill:            return "kill";
+                case X64Syscalls.tgkill:          return "tgkill";
+                case X64Syscalls.tkill:           return "tkill";
+                case X64Syscalls.sigaltstack:     return "sigaltstack";
+                case X64Syscalls.wait4:           return "wait4";
+                case X64Syscalls.clone:           return "clone";
+                case X64Syscalls.execve:          return "execve";
+                case X64Syscalls.socket:          return "socket";
+                case X64Syscalls.bind:            return "bind";
+                case X64Syscalls.connect:         return "connect";
+                case X64Syscalls.setsockopt:      return "setsockopt";
+                case X64Syscalls.getcpu:          return "getcpu";
+                case X64Syscalls.process_vm_readv: return "process_vm_readv";
+                case X64Syscalls.getrandom:       return "getrandom";
+                // VFS syscalls
+                case X64Syscalls.access:          return "access";
+                case X64Syscalls.ioctl:           return "ioctl";
+                case X64Syscalls.writev:          return "writev";
+                case X64Syscalls.poll:            return "poll";
+                case X64Syscalls.getdents:        return "getdents64";
+                case X64Syscalls.getdents64:      return "getdents64";
+                case X64Syscalls.mkdirat:         return "mkdirat";
+                case X64Syscalls.unlinkat:        return "unlinkat";
+                case X64Syscalls.faccessat:       return "faccessat";
+                case X64Syscalls.pipe2:           return "pipe2";
                 default: return $"unknown_{n}";
             }
         }
@@ -442,10 +534,200 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
                     return 0;
                 }
 
+                // ── Additional VFS syscalls from ExAndroidNativeEmu ────────────
+                case "unlink":
+                case "unlinkat":
+                {
+                    string path = name == "unlinkat" ? _memory.ReadString(a1) : _memory.ReadString(a0);
+                    Debug.WriteLine($"[Syscall] {name} path={path} – stub 0");
+                    return 0; // pretend success; VFS doesn't track deletes in SW mode
+                }
+
+                case "access":
+                case "faccessat":
+                {
+                    string path = name == "faccessat" ? _memory.ReadString(a1) : _memory.ReadString(a0);
+                    Debug.WriteLine($"[Syscall] {name} path={path}");
+                    // Check if file exists in VFS.
+                    var stat = _vfs.Stat(path).GetAwaiter().GetResult();
+                    return stat != null ? 0 : -2; // 0=success, ENOENT
+                }
+
+                case "ioctl":
+                    Debug.WriteLine($"[Syscall] ioctl fd={(int)a0} cmd=0x{a1:X} – stub 0");
+                    return 0;
+
+                case "writev":
+                {
+                    // Gather-write: write multiple buffers to a single fd.
+                    var gfd = proc.GetFd((int)a0);
+                    if (gfd == null) return -9; // EBADF
+                    int ptrSz   = _abi == ExecutionMode.Arm64 ? 8 : 4;
+                    int iovcnt  = (int)a2;
+                    ulong iovBase = a1;
+                    long total  = 0;
+                    for (int i = 0; i < iovcnt; i++)
+                    {
+                        ulong base_ = ptrSz == 8 ? _memory.ReadUInt64(iovBase) : _memory.ReadUInt32(iovBase);
+                        ulong len_  = ptrSz == 8 ? _memory.ReadUInt64(iovBase + 8) : _memory.ReadUInt32(iovBase + 4);
+                        iovBase += (ulong)(ptrSz * 2);
+                        if (len_ == 0) continue;
+                        byte[] chunk = _memory.ReadBytes(base_, (int)len_);
+                        if ((int)a0 <= 2)
+                            Debug.WriteLine("[guest] " + Encoding.UTF8.GetString(chunk));
+                        else
+                            _vfs.Write(gfd.Stream, chunk, 0, chunk.Length);
+                        total += (long)len_;
+                    }
+                    return total;
+                }
+
+                case "poll":
+                case "ppoll":
+                    // Polling is a no-op in SW mode: report all fds as readable.
+                    return (int)a1; // nfds
+
+                case "getdents64":
+                    // Return 0 = no entries; full directory listing not implemented.
+                    return 0;
+
+                case "llseek":
+                {
+                    // ARM32 _llseek: fd=a0, offset_high=a1, offset_low=a2, result_ptr=a3, whence=a4
+                    var gfd = proc.GetFd((int)a0);
+                    if (gfd?.Stream == null) return -9;
+                    long off = ((long)(uint)a1 << 32) | (uint)a2;
+                    try
+                    {
+                        long pos = gfd.Stream.Seek(off, (SeekOrigin)(int)a4);
+                        _memory.WriteUInt64(a3, (ulong)pos);
+                        return 0;
+                    }
+                    catch { return -22; }
+                }
+
+                case "fcntl64":
+                    return SysFcntl((int)a0, (int)a1, (int)a2, proc);
+
+                case "statfs":
+                case "statfs64":
+                {
+                    // Fill a simplified statfs struct: report a generous ext4-like filesystem.
+                    ulong addr = a1;
+                    _memory.WriteUInt64(addr, 0xEF53);   addr += 8; // f_type (EXT4_SUPER_MAGIC)
+                    _memory.WriteUInt64(addr, 4096);      addr += 8; // f_bsize
+                    _memory.WriteUInt64(addr, 1000000);   addr += 8; // f_blocks
+                    _memory.WriteUInt64(addr, 500000);    addr += 8; // f_bfree
+                    _memory.WriteUInt64(addr, 500000);    addr += 8; // f_bavail
+                    _memory.WriteUInt64(addr, 100000);    addr += 8; // f_files
+                    _memory.WriteUInt64(addr, 100000);    addr += 8; // f_ffree
+                    return 0;
+                }
+
+                case "mkdirat":
+                {
+                    string dirPath = _memory.ReadString(a1);
+                    Debug.WriteLine($"[Syscall] mkdirat dirfd={(int)a0} path={dirPath} – stub 0");
+                    return 0;
+                }
+
+                case "fstatat":
+                    return SysStatAsync("fstat", a0, a2, a3, 0, proc).GetAwaiter().GetResult();
+
+                case "readlinkat":
+                {
+                    string path = _memory.ReadString(a1);
+                    Debug.WriteLine($"[Syscall] readlinkat path={path} – stub EINVAL");
+                    return -22; // EINVAL: not a symlink
+                }
+
                 // ── Futex ──────────────────────────────────────────────────────
                 case "futex":
-                    // Stub: FUTEX_WAIT returns 0 immediately (no actual blocking),
-                    // FUTEX_WAKE always wakes waiters.
+                    return SysFutex(a0, (int)a1, (int)a2, a3, a4);
+
+                // ── Process / fork / clone ─────────────────────────────────────
+                // In single-process SW emulation mode we stub these out.
+                case "fork":
+                case "vfork":
+                    // Return 0: we are always the child (no real fork).
+                    Debug.WriteLine($"[Syscall] {name} – stub returning 0 (child path)");
+                    return 0;
+
+                case "execve":
+                {
+                    string exe = _memory.ReadString(a0);
+                    Debug.WriteLine($"[Syscall] execve {exe} – stub ENOSYS");
+                    return -38; // ENOSYS
+                }
+
+                case "clone":
+                    // Stub: return 0 = child; store TLS if CLONE_SETTLS requested.
+                    return SysClone(a0, a1, a2, a3, a4, proc);
+
+                case "wait4":
+                    // No real children in SW mode; return 0 immediately.
+                    return 0;
+
+                // ── Signal helpers ─────────────────────────────────────────────
+                case "sigaction":
+                    // Old-style sigaction: same semantics as rt_sigaction.
+                    if (a1 != 0) proc.SetSigHandler((int)a0, a1);
+                    return 0;
+
+                case "sigaltstack":
+                    // Stub: alternate signal stack configuration; safe to ignore.
+                    return 0;
+
+                // ── Misc process ───────────────────────────────────────────────
+                case "ptrace":
+                    // Anti-debug stub: always pretend we are not being traced.
+                    Debug.WriteLine($"[Syscall] ptrace request={(int)a0} – stub 0");
+                    return 0;
+
+                case "tgkill":
+                case "tkill":
+                {
+                    int sig = (int)a2;
+                    // SIGABRT (6): treat as process abort.
+                    if (sig == 6)
+                        throw new Exception($"[Syscall] {name}: SIGABRT sent – guest aborted");
+                    return 0;
+                }
+
+                // ── Sockets (stub – no real networking in SW mode) ─────────────
+                case "socket":
+                    Debug.WriteLine($"[Syscall] socket family={(int)a0} type={(int)a1} – stub -ENOSYS");
+                    return -38; // ENOSYS
+
+                case "bind":
+                case "connect":
+                    return -111; // ECONNREFUSED
+
+                case "setsockopt":
+                    return 0; // success stub
+
+                // ── CPU / system helpers ───────────────────────────────────────
+                case "getcpu":
+                    // Write cpu=1 to first pointer if non-null.
+                    if (a0 != 0) _memory.WriteUInt32(a0, 1);
+                    if (a1 != 0) _memory.WriteUInt32(a1, 0); // node=0
+                    return 0;
+
+                case "getrandom":
+                    return SysGetrandom(a0, (int)a1, (int)a2);
+
+                case "process_vm_readv":
+                    return SysProcessVmReadv(a0, a1, (int)a2, a3, (int)a4, proc);
+
+                // ── ARM-specific ──────────────────────────────────────────────
+                case "ARM_cacheflush":
+                    // Cache flush is a no-op in SW interpretation.
+                    return 0;
+
+                case "ARM_set_tls":
+                    // Store TLS base; in SW mode we just log it.
+                    Debug.WriteLine($"[Syscall] ARM_set_tls 0x{a0:X}");
+                    proc.TlsBase = a0;
                     return 0;
 
                 // ── Unknown ────────────────────────────────────────────────────
@@ -456,6 +738,108 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
         }
 
         // ── Individual syscall implementations ────────────────────────────────
+
+        private long SysFutex(ulong uaddr, int op, int val, ulong timeoutAddr, ulong uaddr2)
+        {
+            const int FUTEX_WAIT      = 0;
+            const int FUTEX_WAKE      = 1;
+            const int FUTEX_PRIVATE   = 128;
+            const int FUTEX_WAIT_BITSET = 9;
+            const int FUTEX_WAKE_BITSET = 10;
+            const int CMD_MASK        = ~(FUTEX_PRIVATE | 256); // strip FUTEX_PRIVATE_FLAG | FUTEX_CLOCK_REALTIME
+
+            int cmd = op & CMD_MASK;
+
+            if (cmd == FUTEX_WAIT || cmd == FUTEX_WAIT_BITSET)
+            {
+                // Read current value; if it differs from val return EAGAIN.
+                uint current = _memory.ReadUInt32(uaddr);
+                if (current != (uint)val)
+                    return -11; // EAGAIN
+                // In single-threaded SW mode we can't actually block; return 0 immediately.
+                return 0;
+            }
+            if (cmd == FUTEX_WAKE || cmd == FUTEX_WAKE_BITSET)
+                return 0; // no waiters to wake in single-thread mode
+
+            return 0; // all other futex ops: stub success
+        }
+
+        private long SysClone(ulong flags, ulong childStack, ulong parentTid, ulong newTls,
+                               ulong childTid, LinuxProcess proc)
+        {
+            const ulong CLONE_THREAD    = 0x00010000;
+            const ulong CLONE_SETTLS    = 0x00080000;
+
+            Debug.WriteLine($"[Syscall] clone flags=0x{flags:X} childStack=0x{childStack:X}");
+
+            // If CLONE_THREAD is not set it's a fork; stub returns child=0 (child path).
+            if ((flags & CLONE_THREAD) == 0)
+                return 0;
+
+            // Thread clone: store TLS base if CLONE_SETTLS requested.
+            if ((flags & CLONE_SETTLS) != 0 && newTls != 0)
+            {
+                Debug.WriteLine($"[Syscall] clone CLONE_SETTLS tls=0x{newTls:X}");
+                proc.TlsBase = newTls;
+            }
+
+            // In single-threaded SW mode: return fake child tid.
+            return 1; // child thread tid stub
+        }
+
+        private long SysGetrandom(ulong buf, int count, int flags)
+        {
+            if (buf == 0 || count <= 0) return -22; // EINVAL
+            var rng = new Random();
+            var bytes = new byte[count];
+            rng.NextBytes(bytes);
+            _memory.WriteBytes(buf, bytes, 0, bytes.Length);
+            return count;
+        }
+
+        private long SysProcessVmReadv(ulong pid, ulong localIov, int liovcnt,
+                                        ulong remoteIov, int riovcnt, LinuxProcess proc)
+        {
+            // Only allow reading from ourselves.
+            if ((long)pid != proc.Pid)
+            {
+                Debug.WriteLine($"[Syscall] process_vm_readv: cross-process not supported");
+                return -1; // EPERM
+            }
+
+            long totalRead = 0;
+            int ptrSz = _abi == ExecutionMode.Arm64 ? 8 : 4;
+            ulong remoteOff = remoteIov;
+            // Collect remote data.
+            var collected = new System.Collections.Generic.List<byte[]>();
+            for (int i = 0; i < riovcnt; i++)
+            {
+                ulong rbase = ptrSz == 8 ? _memory.ReadUInt64(remoteOff) : _memory.ReadUInt32(remoteOff);
+                ulong rlen  = ptrSz == 8 ? _memory.ReadUInt64(remoteOff + 8) : _memory.ReadUInt32(remoteOff + 4);
+                collected.Add(_memory.ReadBytes(rbase, (int)rlen));
+                remoteOff += (ulong)(ptrSz * 2);
+            }
+            // Flatten.
+            var flat = new System.Collections.Generic.List<byte>();
+            foreach (var c in collected) flat.AddRange(c);
+            byte[] src = flat.ToArray();
+
+            // Write into local iovecs.
+            int srcOff = 0;
+            ulong localOff = localIov;
+            for (int i = 0; i < liovcnt && srcOff < src.Length; i++)
+            {
+                ulong lbase = ptrSz == 8 ? _memory.ReadUInt64(localOff) : _memory.ReadUInt32(localOff);
+                ulong llen  = ptrSz == 8 ? _memory.ReadUInt64(localOff + 8) : _memory.ReadUInt32(localOff + 4);
+                int toCopy  = (int)Math.Min(llen, (ulong)(src.Length - srcOff));
+                _memory.WriteBytes(lbase, src, srcOff, toCopy);
+                srcOff    += toCopy;
+                totalRead += toCopy;
+                localOff  += (ulong)(ptrSz * 2);
+            }
+            return totalRead;
+        }
 
         private async Task<long> SysOpenAsync(string path, int flags, LinuxProcess proc)
         {
@@ -482,10 +866,10 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
             ulong addr = a1;
             _memory.WriteUInt64(addr,       stat.Dev);        addr += 8;
             _memory.WriteUInt64(addr,       stat.Ino);        addr += 8;
-            _memory.WriteUInt32((uint)addr, stat.Mode);       addr += 4;
-            _memory.WriteUInt32((uint)addr, stat.Nlink);      addr += 4;
-            _memory.WriteUInt32((uint)addr, (uint)stat.Uid);  addr += 4;
-            _memory.WriteUInt32((uint)addr, (uint)stat.Gid);  addr += 4;
+            _memory.WriteUInt32(addr, stat.Mode);       addr += 4;
+            _memory.WriteUInt32(addr, stat.Nlink);      addr += 4;
+            _memory.WriteUInt32(addr, (uint)stat.Uid);  addr += 4;
+            _memory.WriteUInt32(addr, (uint)stat.Gid);  addr += 4;
             _memory.WriteUInt64(addr,       stat.RDev);       addr += 8;
             _memory.WriteUInt64(addr,       (ulong)stat.Size);addr += 8;
             _memory.WriteUInt64(addr,       4096);             addr += 8; // blksize
@@ -559,20 +943,48 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
         private long SysSysinfo(ulong buf)
         {
             if (buf == 0) return -14;
-            // struct sysinfo (simplified 64-bit version).
             ulong addr = buf;
-            _memory.WriteUInt64(addr, 0);                  addr += 8; // uptime
-            _memory.WriteUInt64(addr, 0x40000000UL);       addr += 8; // loads[0]
-            _memory.WriteUInt64(addr, 0x40000000UL);       addr += 8; // loads[1]
-            _memory.WriteUInt64(addr, 0x40000000UL);       addr += 8; // loads[2]
-            _memory.WriteUInt64(addr, 2UL * 1024 * 1024 * 1024); addr += 8; // totalram 2 GB
-            _memory.WriteUInt64(addr, 1UL * 1024 * 1024 * 1024); addr += 8; // freeram
-            _memory.WriteUInt64(addr, 0);                  addr += 8; // sharedram
-            _memory.WriteUInt64(addr, 0);                  addr += 8; // bufferram
-            _memory.WriteUInt64(addr, 4UL * 1024 * 1024 * 1024); addr += 8; // totalswap
-            _memory.WriteUInt64(addr, 4UL * 1024 * 1024 * 1024); addr += 8; // freeswap
-            _memory.WriteUInt16(addr, 1);                  addr += 2; // procs
-            _memory.WriteUInt32(addr, 4096);               // mem_unit = 1 byte? No: PAGE_SIZE
+            // Emit struct sysinfo matching ARM32 (4-byte fields) or ARM64/x64 (8-byte fields).
+            // See ExAndroidNativeEmu syscall_hooks.py __sysinfo for reference layout.
+            if (_abi == ExecutionMode.Arm32)
+            {
+                // ARM32: all kernel_long_t fields are 4 bytes.
+                _memory.WriteUInt32(addr, 0);               addr += 4; // uptime
+                _memory.WriteUInt32(addr, 503328);          addr += 4; // loads[0]
+                _memory.WriteUInt32(addr, 504576);          addr += 4; // loads[1]
+                _memory.WriteUInt32(addr, 537280);          addr += 4; // loads[2]
+                _memory.WriteUInt32(addr, 1945137152);      addr += 4; // totalram
+                _memory.WriteUInt32(addr, 47845376);        addr += 4; // freeram
+                _memory.WriteUInt32(addr, 0);               addr += 4; // sharedram
+                _memory.WriteUInt32(addr, 169373696);       addr += 4; // bufferram
+                _memory.WriteUInt32(addr, 0);               addr += 4; // totalswap
+                _memory.WriteUInt32(addr, 0);               addr += 4; // freeswap
+                _memory.WriteUInt16(addr, 1);               addr += 2; // procs
+                _memory.WriteUInt16(addr, 0);               addr += 2; // pad
+                _memory.WriteUInt32(addr, 1185939456);      addr += 4; // totalhigh
+                _memory.WriteUInt32(addr, 1863680);         addr += 4; // freehigh
+                _memory.WriteUInt32(addr, 1);                          // mem_unit
+            }
+            else
+            {
+                // ARM64 / x64: all kernel_long_t fields are 8 bytes.
+                _memory.WriteUInt64(addr, 0);                     addr += 8; // uptime
+                _memory.WriteUInt64(addr, 503328);                addr += 8; // loads[0]
+                _memory.WriteUInt64(addr, 504576);                addr += 8; // loads[1]
+                _memory.WriteUInt64(addr, 537280);                addr += 8; // loads[2]
+                _memory.WriteUInt64(addr, 2UL * 1024 * 1024 * 1024); addr += 8; // totalram
+                _memory.WriteUInt64(addr, 1UL * 1024 * 1024 * 1024); addr += 8; // freeram
+                _memory.WriteUInt64(addr, 0);                     addr += 8; // sharedram
+                _memory.WriteUInt64(addr, 169373696);             addr += 8; // bufferram
+                _memory.WriteUInt64(addr, 0);                     addr += 8; // totalswap
+                _memory.WriteUInt64(addr, 0);                     addr += 8; // freeswap
+                _memory.WriteUInt16(addr, 1);                     addr += 2; // procs
+                _memory.WriteUInt16(addr, 0);                     addr += 2; // pad
+                _memory.WriteUInt32(addr, 0);                     addr += 4; // (alignment pad)
+                _memory.WriteUInt64(addr, 0);                     addr += 8; // totalhigh
+                _memory.WriteUInt64(addr, 0);                     addr += 8; // freehigh
+                _memory.WriteUInt32(addr, 1);                              // mem_unit
+            }
             return 0;
         }
 

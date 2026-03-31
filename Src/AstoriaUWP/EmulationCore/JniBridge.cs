@@ -203,6 +203,414 @@ namespace DalvikUWPCSharp.Classes
         /// Returns the number of registered native methods (useful for diagnostics).
         /// </summary>
         public int RegisteredMethodCount => registeredMethods.Count;
+
+        // ── Additional JNI functions from ExAndroidNativeEmu jni_env.py ──────────
+
+        /// <summary>
+        /// IsSameObject (JNI slot 24) – returns true if both refs point to the same object.
+        /// </summary>
+        public bool IsSameObject(int ref1, int ref2)
+        {
+            if (ref1 == ref2) return true;
+            object o1 = ResolveRef(ref1);
+            object o2 = ResolveRef(ref2);
+            return ReferenceEquals(o1, o2);
+        }
+
+        /// <summary>GetObjectClass (JNI slot 31) – returns the class of an object ref.</summary>
+        public int GetObjectClass(int objRef)
+        {
+            object obj = ResolveRef(objRef);
+            if (obj == null) return 0;
+            Type t = obj.GetType();
+            return NewLocalRef(t);
+        }
+
+        /// <summary>IsInstanceOf (JNI slot 32) – checks instanceof.</summary>
+        public bool IsInstanceOf(int objRef, int classRef)
+        {
+            object obj = ResolveRef(objRef);
+            object cls = ResolveRef(classRef);
+            if (obj == null || cls == null) return false;
+            if (cls is Type t) return t.IsInstanceOfType(obj);
+            return false;
+        }
+
+        // ── Exception handling (JNI slots 13-18) ─────────────────────────────────
+
+        private object _pendingException;
+
+        /// <summary>ExceptionOccurred (slot 15) – returns ref to pending exception, or 0.</summary>
+        public int ExceptionOccurred()
+        {
+            if (_pendingException == null) return 0;
+            return NewLocalRef(_pendingException);
+        }
+
+        /// <summary>ExceptionDescribe (slot 16) – print pending exception to debug log.</summary>
+        public void ExceptionDescribe()
+        {
+            if (_pendingException != null)
+                Debug.WriteLine("[JNI] Pending exception: " + _pendingException);
+        }
+
+        /// <summary>ExceptionClear (slot 17) – clear pending exception.</summary>
+        public void ExceptionClear()
+        {
+            _pendingException = null;
+        }
+
+        /// <summary>ExceptionCheck (slot 228) – returns true if there is a pending exception.</summary>
+        public bool ExceptionCheck() => _pendingException != null;
+
+        /// <summary>Throw (slot 13) – sets a pending exception from an existing throwable ref.</summary>
+        public int Throw(int throwableRef)
+        {
+            _pendingException = ResolveRef(throwableRef);
+            return 0;
+        }
+
+        /// <summary>ThrowNew (slot 14) – construct and set a new exception.</summary>
+        public int ThrowNew(int classRef, string message)
+        {
+            object cls = ResolveRef(classRef);
+            _pendingException = new Exception($"[JNI] ThrowNew {cls}: {message}");
+            Debug.WriteLine($"[JNI] ThrowNew: {_pendingException}");
+            return 0;
+        }
+
+        /// <summary>FatalError (slot 18) – print message and abort.</summary>
+        public void FatalError(string message)
+        {
+            throw new Exception("[JNI] FatalError: " + message);
+        }
+
+        // ── Local frame management (JNI slots 19-20, 26) ─────────────────────────
+
+        private readonly System.Collections.Generic.Stack<int> _localFrameStack =
+            new System.Collections.Generic.Stack<int>();
+
+        /// <summary>PushLocalFrame (slot 19) – create a new local reference frame.</summary>
+        public int PushLocalFrame(int capacity)
+        {
+            _localFrameStack.Push(nextLocalRef);
+            return 0;
+        }
+
+        /// <summary>PopLocalFrame (slot 20) – pop the top local frame, returning a result ref.</summary>
+        public int PopLocalFrame(int resultRef)
+        {
+            if (_localFrameStack.Count > 0)
+            {
+                int savedNext = _localFrameStack.Pop();
+                // Free locals allocated since push.
+                for (int id = savedNext; id < nextLocalRef; id++)
+                    localRefs.Remove(id);
+                nextLocalRef = savedNext;
+            }
+            if (resultRef != 0)
+            {
+                object result = ResolveRef(resultRef);
+                return result != null ? NewLocalRef(result) : 0;
+            }
+            return 0;
+        }
+
+        /// <summary>EnsureLocalCapacity (slot 26) – stub; always succeeds.</summary>
+        public int EnsureLocalCapacity(int capacity) => 0;
+
+        // ── Object creation (JNI slots 27-30) ────────────────────────────────────
+
+        /// <summary>AllocObject (slot 27) – allocate an uninitialised object of the given class.</summary>
+        public int AllocObject(int classRef)
+        {
+            object cls = ResolveRef(classRef);
+            string className = cls is DalvikClassRef dcr ? dcr.ClassName
+                             : cls is Type t ? t.FullName : cls?.ToString() ?? "Unknown";
+            Debug.WriteLine($"[JNI] AllocObject {className}");
+            return NewLocalRef(new DalvikClassRef(className));
+        }
+
+        // ── Method / field lookup (JNI slots 33, 94, 113, 144) ───────────────────
+
+        /// <summary>
+        /// GetMethodId (slot 33) – look up a virtual method ID.
+        /// Returns a token that CallXxxMethod can use.
+        /// </summary>
+        public int GetMethodId(int classRef, string name, string sig)
+        {
+            string className = ClassNameFromRef(classRef);
+            string key = $"{className}.{name}{sig}";
+            Debug.WriteLine($"[JNI] GetMethodId {key}");
+            return NewLocalRef(new JniMethodId(className, name, sig, isStatic: false));
+        }
+
+        /// <summary>GetStaticMethodId (slot 113) – look up a static method ID.</summary>
+        public int GetStaticMethodId(int classRef, string name, string sig)
+        {
+            string className = ClassNameFromRef(classRef);
+            string key = $"{className}.{name}{sig}";
+            Debug.WriteLine($"[JNI] GetStaticMethodId {key}");
+            return NewLocalRef(new JniMethodId(className, name, sig, isStatic: true));
+        }
+
+        /// <summary>GetFieldId (slot 94) – look up an instance field ID.</summary>
+        public int GetFieldId(int classRef, string name, string sig)
+        {
+            string className = ClassNameFromRef(classRef);
+            Debug.WriteLine($"[JNI] GetFieldId {className}.{name} {sig}");
+            return NewLocalRef(new JniFieldId(className, name, sig, isStatic: false));
+        }
+
+        /// <summary>GetStaticFieldId (slot 144) – look up a static field ID.</summary>
+        public int GetStaticFieldId(int classRef, string name, string sig)
+        {
+            string className = ClassNameFromRef(classRef);
+            Debug.WriteLine($"[JNI] GetStaticFieldId {className}.{name} {sig}");
+            return NewLocalRef(new JniFieldId(className, name, sig, isStatic: true));
+        }
+
+        // ── Call*Method helpers (slots 34-143) ───────────────────────────────────
+
+        /// <summary>
+        /// Call a virtual or static method identified by a JniMethodId ref.
+        /// Falls back to the registered native method table.
+        /// </summary>
+        public JniValue CallMethod(int objRef, int methodIdRef, JniValue[] args)
+        {
+            var mid = ResolveRef(methodIdRef) as JniMethodId;
+            if (mid == null) return JniValue.Void();
+
+            var result = CallNativeMethod(mid.ClassName, mid.MethodName, mid.Signature,
+                                          ResolveRef(objRef), args);
+            return result ?? JniValue.Void();
+        }
+
+        /// <summary>CallVoidMethod / CallStaticVoidMethod convenience overload.</summary>
+        public void CallVoidMethod(int objRef, int methodIdRef, JniValue[] args)
+            => CallMethod(objRef, methodIdRef, args);
+
+        /// <summary>CallIntMethod / CallStaticIntMethod convenience overload.</summary>
+        public int CallIntMethod(int objRef, int methodIdRef, JniValue[] args)
+            => CallMethod(objRef, methodIdRef, args).I;
+
+        /// <summary>CallBooleanMethod convenience overload.</summary>
+        public bool CallBooleanMethod(int objRef, int methodIdRef, JniValue[] args)
+            => CallMethod(objRef, methodIdRef, args).Z;
+
+        /// <summary>CallLongMethod convenience overload.</summary>
+        public long CallLongMethod(int objRef, int methodIdRef, JniValue[] args)
+            => CallMethod(objRef, methodIdRef, args).J;
+
+        /// <summary>CallObjectMethod convenience overload.</summary>
+        public int CallObjectMethod(int objRef, int methodIdRef, JniValue[] args)
+        {
+            var v = CallMethod(objRef, methodIdRef, args);
+            return v.L != null ? NewLocalRef(v.L) : 0;
+        }
+
+        // ── Field get/set helpers ─────────────────────────────────────────────────
+
+        private readonly Dictionary<string, object> _instanceFields = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _staticFields   = new Dictionary<string, object>();
+
+        /// <summary>GetObjectField (slot 95).</summary>
+        public int GetObjectField(int objRef, int fieldIdRef)
+        {
+            var fid = ResolveRef(fieldIdRef) as JniFieldId;
+            if (fid == null) return 0;
+            string key = fid.ClassName + "." + fid.FieldName;
+            _instanceFields.TryGetValue(key, out object val);
+            return val != null ? NewLocalRef(val) : 0;
+        }
+
+        /// <summary>SetObjectField (slot 104).</summary>
+        public void SetObjectField(int objRef, int fieldIdRef, int valueRef)
+        {
+            var fid = ResolveRef(fieldIdRef) as JniFieldId;
+            if (fid == null) return;
+            string key = fid.ClassName + "." + fid.FieldName;
+            _instanceFields[key] = ResolveRef(valueRef);
+        }
+
+        /// <summary>GetStaticObjectField (slot 145).</summary>
+        public int GetStaticObjectField(int classRef, int fieldIdRef)
+        {
+            var fid = ResolveRef(fieldIdRef) as JniFieldId;
+            if (fid == null) return 0;
+            string key = fid.ClassName + "." + fid.FieldName;
+            _staticFields.TryGetValue(key, out object val);
+            return val != null ? NewLocalRef(val) : 0;
+        }
+
+        /// <summary>SetStaticObjectField (slot 154).</summary>
+        public void SetStaticObjectField(int classRef, int fieldIdRef, int valueRef)
+        {
+            var fid = ResolveRef(fieldIdRef) as JniFieldId;
+            if (fid == null) return;
+            string key = fid.ClassName + "." + fid.FieldName;
+            _staticFields[key] = ResolveRef(valueRef);
+        }
+
+        // ── Array operations (slots 172-228) ─────────────────────────────────────
+
+        /// <summary>NewObjectArray (slot 186).</summary>
+        public int NewObjectArray(int length, int classRef, int initRef)
+        {
+            var arr = new object[length];
+            object initVal = ResolveRef(initRef);
+            for (int i = 0; i < length; i++) arr[i] = initVal;
+            return NewLocalRef(arr);
+        }
+
+        /// <summary>GetObjectArrayElement (slot 187).</summary>
+        public int GetObjectArrayElement(int arrayRef, int index)
+        {
+            if (ResolveRef(arrayRef) is object[] arr && index >= 0 && index < arr.Length)
+                return arr[index] != null ? NewLocalRef(arr[index]) : 0;
+            return 0;
+        }
+
+        /// <summary>SetObjectArrayElement (slot 188).</summary>
+        public void SetObjectArrayElement(int arrayRef, int index, int valueRef)
+        {
+            if (ResolveRef(arrayRef) is object[] arr && index >= 0 && index < arr.Length)
+                arr[index] = ResolveRef(valueRef);
+        }
+
+        /// <summary>NewByteArray (slot 196).</summary>
+        public int NewByteArray(int length) => NewLocalRef(new byte[length]);
+
+        /// <summary>NewIntArray (slot 199).</summary>
+        public int NewIntArray(int length) => NewLocalRef(new int[length]);
+
+        /// <summary>NewCharArray (slot 197).</summary>
+        public int NewCharArray(int length) => NewLocalRef(new char[length]);
+
+        /// <summary>GetByteArrayElements (slot 209) – returns the backing array reference.</summary>
+        public byte[] GetByteArrayElements(int arrayRef)
+            => ResolveRef(arrayRef) as byte[];
+
+        /// <summary>
+        /// GetByteArrayRegion (slot 219) – copy a range from a byte array into a managed buffer.
+        /// </summary>
+        public byte[] GetByteArrayRegion(int arrayRef, int start, int len)
+        {
+            if (ResolveRef(arrayRef) is byte[] arr)
+            {
+                var result = new byte[Math.Min(len, arr.Length - start)];
+                Array.Copy(arr, start, result, 0, result.Length);
+                return result;
+            }
+            return new byte[0];
+        }
+
+        /// <summary>SetByteArrayRegion (slot 220) – copy bytes into a Java byte array.</summary>
+        public void SetByteArrayRegion(int arrayRef, int start, byte[] src)
+        {
+            if (ResolveRef(arrayRef) is byte[] arr)
+                Array.Copy(src, 0, arr, start, Math.Min(src.Length, arr.Length - start));
+        }
+
+        // ── String helpers (slots 163-170) ───────────────────────────────────────
+
+        /// <summary>NewString (slot 163) – creates a Java string from a char array.</summary>
+        public int NewString(char[] chars, int length)
+            => NewLocalRef(new string(chars, 0, length));
+
+        /// <summary>GetStringLength (slot 164) – returns the length of a Java string.</summary>
+        public int GetStringLength(int stringRef)
+        {
+            if (ResolveRef(stringRef) is string s) return s.Length;
+            return 0;
+        }
+
+        /// <summary>GetStringUTFLength (slot 168).</summary>
+        public int GetStringUTFLength(int stringRef)
+        {
+            if (ResolveRef(stringRef) is string s)
+                return System.Text.Encoding.UTF8.GetByteCount(s);
+            return 0;
+        }
+
+        /// <summary>GetStringChars (slot 165) – returns the char buffer of a Java string.</summary>
+        public char[] GetStringChars(int stringRef)
+        {
+            if (ResolveRef(stringRef) is string s) return s.ToCharArray();
+            return new char[0];
+        }
+
+        /// <summary>ReleaseStringChars stub (slot 166).</summary>
+        public void ReleaseStringChars(int stringRef, char[] chars) { }
+
+        /// <summary>GetStringUTFChars via ref (slot 169).</summary>
+        public string GetStringUTFCharsFromRef(int stringRef)
+            => GetStringUTFChars(stringRef);
+
+        /// <summary>ReleaseStringUTFChars stub (slot 170).</summary>
+        public void ReleaseStringUTFChars(int stringRef, string chars) { }
+
+        // ── Native method registration (JNI slot 215) ─────────────────────────────
+
+        /// <summary>
+        /// RegisterNatives (JNI slot 215) – bulk-register native method implementations.
+        /// Equivalent to ExAndroidNativeEmu jni_env.py register_natives.
+        /// </summary>
+        public int RegisterNatives(int classRef, JniNativeMethodDescriptor[] methods)
+        {
+            string className = ClassNameFromRef(classRef);
+            foreach (var m in methods)
+            {
+                RegisterNativeMethod(className, m.Name, m.Signature, m.Implementation);
+            }
+            Debug.WriteLine($"[JNI] RegisterNatives {className} count={methods.Length}");
+            return 0;
+        }
+
+        // ── JavaVM helpers ────────────────────────────────────────────────────────
+
+        /// <summary>GetJavaVM (JNI slot 219) – returns a reference to the JavaVM.</summary>
+        public int GetJavaVM() => 1; // stub handle
+
+        /// <summary>GetVersion (JNI slot 4) – returns JNI_VERSION_1_6.</summary>
+        public int GetVersion() => 0x00010006;
+
+        // ── Weak references (slots 226-227) ───────────────────────────────────────
+
+        private readonly Dictionary<int, WeakReference> _weakRefs = new Dictionary<int, WeakReference>();
+        private int _nextWeakRef = 0x8000;
+
+        /// <summary>NewWeakGlobalRef (slot 226).</summary>
+        public int NewWeakGlobalRef(int objRef)
+        {
+            object obj = ResolveRef(objRef);
+            if (obj == null) return 0;
+            int id = _nextWeakRef++;
+            _weakRefs[id] = new WeakReference(obj);
+            return id;
+        }
+
+        /// <summary>DeleteWeakGlobalRef (slot 227).</summary>
+        public void DeleteWeakGlobalRef(int weakRef) => _weakRefs.Remove(weakRef);
+
+        /// <summary>GetObjectRefType (slot 232) – returns reference type.</summary>
+        public int GetObjectRefType(int objRef)
+        {
+            if (globalRefs.ContainsKey(objRef)) return 2; // JNIGlobalRefType
+            if (localRefs.ContainsKey(objRef))  return 1; // JNILocalRefType
+            if (_weakRefs.ContainsKey(objRef))  return 3; // JNIWeakGlobalRefType
+            return 0; // JNIInvalidRefType
+        }
+
+        // ── Internal helpers ──────────────────────────────────────────────────────
+
+        private string ClassNameFromRef(int classRef)
+        {
+            object cls = ResolveRef(classRef);
+            if (cls is DalvikClassRef dcr) return dcr.ClassName;
+            if (cls is Type t) return t.FullName ?? t.Name;
+            return cls?.ToString() ?? "Unknown";
+        }
     }
 
     /// <summary>
@@ -215,6 +623,70 @@ namespace DalvikUWPCSharp.Classes
         public string ClassName { get; }
         public DalvikClassRef(string className) { ClassName = className; }
         public override string ToString() => "[ClassRef: " + ClassName + "]";
+    }
+
+    /// <summary>
+    /// Represents a JNI method identifier returned by GetMethodId / GetStaticMethodId.
+    /// Equivalent to jmethodID in the JNI spec.
+    /// </summary>
+    public sealed class JniMethodId
+    {
+        public string ClassName  { get; }
+        public string MethodName { get; }
+        public string Signature  { get; }
+        public bool   IsStatic   { get; }
+
+        public JniMethodId(string className, string methodName, string sig, bool isStatic)
+        {
+            ClassName  = className;
+            MethodName = methodName;
+            Signature  = sig;
+            IsStatic   = isStatic;
+        }
+
+        public override string ToString() =>
+            $"[MethodId: {ClassName}.{MethodName}{Signature} static={IsStatic}]";
+    }
+
+    /// <summary>
+    /// Represents a JNI field identifier returned by GetFieldId / GetStaticFieldId.
+    /// Equivalent to jfieldID in the JNI spec.
+    /// </summary>
+    public sealed class JniFieldId
+    {
+        public string ClassName { get; }
+        public string FieldName { get; }
+        public string Signature { get; }
+        public bool   IsStatic  { get; }
+
+        public JniFieldId(string className, string fieldName, string sig, bool isStatic)
+        {
+            ClassName = className;
+            FieldName = fieldName;
+            Signature = sig;
+            IsStatic  = isStatic;
+        }
+
+        public override string ToString() =>
+            $"[FieldId: {ClassName}.{FieldName} {Signature} static={IsStatic}]";
+    }
+
+    /// <summary>
+    /// Describes a single native method binding passed to RegisterNatives.
+    /// Mirrors the JNINativeMethod struct from jni.h.
+    /// </summary>
+    public sealed class JniNativeMethodDescriptor
+    {
+        public string Name           { get; }
+        public string Signature      { get; }
+        public JniNativeMethod Implementation { get; }
+
+        public JniNativeMethodDescriptor(string name, string sig, JniNativeMethod impl)
+        {
+            Name           = name;
+            Signature      = sig;
+            Implementation = impl;
+        }
     }
 
     /// <summary>
