@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using Windows.ApplicationModel.Core;
 using Windows.Foundation.Metadata;
 using Windows.Storage;
 using Windows.UI;
@@ -104,7 +105,7 @@ namespace DalvikUWPCSharp
                     if (cpu != null)
                     {
                         await cpu.Start();
-                        Render();
+                        await Render();
                     }
                     else
                     {
@@ -143,9 +144,83 @@ namespace DalvikUWPCSharp
             PreSplashGrid.Visibility = Visibility.Collapsed;
         }//preloadDone end
 
+        private CoreDispatcher GetRenderDispatcher()
+        {
+            if (Dispatcher != null)
+                return Dispatcher;
+
+            try
+            {
+                return CoreApplication.MainView?.CoreWindow?.Dispatcher;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[EmuPage] [Dispatcher] Unable to resolve UI dispatcher: " + ex.Message);
+                return null;
+            }
+        }
+
+        private void RunOnRenderThread(Action action)
+        {
+            var dispatcher = GetRenderDispatcher();
+            if (dispatcher == null || dispatcher.HasThreadAccess)
+            {
+                action();
+                return;
+            }
+
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => action())
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+        }
+
+        private bool UpdateRenderTarget(UIElement element, bool replaceExisting)
+        {
+            if (element == null)
+                return false;
+
+            bool updated = false;
+            RunOnRenderThread(() =>
+            {
+                if (replaceExisting)
+                {
+                    RenderTargetGrid.Children.Clear();
+                    RenderTargetGrid.Children.Add(element);
+                    updated = true;
+                }
+                else if (RenderTargetGrid.Children.Count == 0)
+                {
+                    RenderTargetGrid.Children.Add(element);
+                    updated = true;
+                }
+            });
+
+            return updated;
+        }
+
+        private bool TryCreateNativeRenderSurface()
+        {
+            bool created = false;
+            RunOnRenderThread(() =>
+            {
+                if (RenderTargetGrid.Children.Count == 0)
+                {
+                    var surface = new DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface();
+                    surface.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    surface.VerticalAlignment = VerticalAlignment.Stretch;
+                    DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = surface;
+                    RenderTargetGrid.Children.Add(surface);
+                    created = true;
+                }
+            });
+
+            return created;
+        }
+
 
         // Render
-        private async void Render()
+        private async Task Render()
         {
             StorageFile sf = null;
             bool hasLayout = false;
@@ -200,9 +275,8 @@ namespace DalvikUWPCSharp
                     {
                         // Only populate the grid from the fallback renderer if Start()/setContentView
                         // has not already set it up. If the grid is already populated we leave it alone.
-                        if (RenderTargetGrid.Children.Count == 0)
+                        if (UpdateRenderTarget(renderedLayout, false))
                         {
-                            RenderTargetGrid.Children.Add(renderedLayout);
                             Debug.WriteLine("[EmuPage] [Render] XML layout added to RenderTargetGrid.");
                         }
                         else
@@ -220,13 +294,9 @@ namespace DalvikUWPCSharp
                     // Layout XML was found but rendering failed – fall back to a native
                     // render surface so the app's programmatic drawing can still appear.
                     Debug.WriteLine("[EmuPage] [Render] RenderXmlFile returned null – falling back to native render surface.");
-                    if (RenderTargetGrid.Children.Count == 0)
+                    if (!TryCreateNativeRenderSurface())
                     {
-                        var fallbackSurface = new DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface();
-                        fallbackSurface.HorizontalAlignment = HorizontalAlignment.Stretch;
-                        fallbackSurface.VerticalAlignment = VerticalAlignment.Stretch;
-                        DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = fallbackSurface;
-                        RenderTargetGrid.Children.Add(fallbackSurface);
+                        Debug.WriteLine("[EmuPage] [Render] RenderTargetGrid already populated by setContentView, skipping fallback native surface.");
                     }
                 }
             }
@@ -236,14 +306,9 @@ namespace DalvikUWPCSharp
                 // Only create the native surface if setContentView has not already populated the grid.
                 // All UI modifications happen on the UI thread (UWP serializes all UI updates),
                 // so Children.Count is safe to read here without additional synchronisation.
-                if (RenderTargetGrid.Children.Count == 0)
+                if (TryCreateNativeRenderSurface())
                 {
                     Debug.WriteLine("[EmuPage] [Render] Creating full-screen AndroidRenderSurface for native rendering.");
-                    var nativeSurface = new DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface();
-                    nativeSurface.HorizontalAlignment = HorizontalAlignment.Stretch;
-                    nativeSurface.VerticalAlignment = VerticalAlignment.Stretch;
-                    DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = nativeSurface;
-                    RenderTargetGrid.Children.Add(nativeSurface);
                     Debug.WriteLine("[EmuPage] [Render] Native render surface ready.");
                 }
                 else
@@ -260,10 +325,7 @@ namespace DalvikUWPCSharp
         // SetContentView
         public void SetContentView(View v)
         {
-            //TEST
-            RenderTargetGrid.Children.Clear();
-            RenderTargetGrid.Children.Add(v);
-
+            UpdateRenderTarget(v?.WinUI, true);
         }//SetContentView end
 
 
@@ -274,8 +336,7 @@ namespace DalvikUWPCSharp
         {
             Debug.WriteLine("[EmuPage] SetNativeRenderSurface called.");
             DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = surface;
-            RenderTargetGrid.Children.Clear();
-            RenderTargetGrid.Children.Add(surface);
+            UpdateRenderTarget(surface, true);
         }//SetNativeRenderSurface end
 
 
