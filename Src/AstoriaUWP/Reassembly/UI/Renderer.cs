@@ -1243,7 +1243,7 @@ namespace DalvikUWPCSharp.Reassembly.UI
             // ── ExpandableListView ───────────────────────────────────────────────
             else if (xeName == "ExpandableListView" || xeName == "android.widget.ExpandableListView")
             {
-                ListView elv = new ListView();
+                Windows.UI.Xaml.Controls.ListView elv = new Windows.UI.Xaml.Controls.ListView();
                 ApplyCommonAttributes(elv, xe);
                 return elv;
             }
