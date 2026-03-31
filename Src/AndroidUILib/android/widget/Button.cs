@@ -11,20 +11,26 @@ namespace AndroidInteropLib.android.widget
         public Button()
              : base(null, null)
         {
-            button = new Windows.UI.Xaml.Controls.Button();
-            this.WinUI = button;
         }
 
         public Button(Context context, AttributeSet attrs)
         : base(context, attrs)
         {
+        }
+
+        public override void CreateWinUI(params object[] obj)
+        {
             button = new Windows.UI.Xaml.Controls.Button();
             this.WinUI = button;
+            base.CreateWinUI(obj);
         }
 
         public override void setText(string text)
         {
-            button.Content = text;
+            if (button != null)
+                button.Content = text;
+            else
+                base.setText(text);
         }
 
         // Additional Android Button APIs can be mapped here

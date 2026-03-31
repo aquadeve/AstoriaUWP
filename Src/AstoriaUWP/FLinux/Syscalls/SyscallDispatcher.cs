@@ -401,8 +401,6 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
                     return 0; // stub: pretend to succeed
 
                 case "kill":
-                case "tkill":
-                case "tgkill":
                     // For our single-process model, signals to ourselves are a no-op.
                     return 0;
 
