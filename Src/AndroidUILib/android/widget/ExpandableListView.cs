@@ -1,3 +1,5 @@
+using AndroidInteropLib.android.content;
+using AndroidInteropLib.android.util;
 using AndroidInteropLib.android.view;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -10,6 +12,7 @@ namespace AndroidInteropLib.android.widget
     public class ExpandableListView : ListView
     {
         public ExpandableListView() : base() { }
+        public ExpandableListView(Context c, AttributeSet a) : base() { }
 
         public void expandGroup(int groupPos) { }
 

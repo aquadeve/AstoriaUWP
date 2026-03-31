@@ -16,7 +16,7 @@ namespace AndroidInteropLib.android.support.design.widget
         {
             commandBar.VerticalAlignment = VerticalAlignment.Bottom;
             commandBar.HorizontalAlignment = HorizontalAlignment.Stretch;
-            WinUI = commandBar;
+            WinUI.Content = commandBar;
         }
 
         public void setTitle(string title) { }
