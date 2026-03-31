@@ -4,6 +4,7 @@
 
 using System;
 using System.Diagnostics;
+using Windows.ApplicationModel.Core;
 using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Core;
@@ -50,6 +51,17 @@ namespace DalvikUWPCSharp.Reassembly.UI
             this.Content = renderCanvas;
             this.SizeChanged += OnSizeChanged;
             uiDispatcher = Window.Current?.Dispatcher;
+            if (uiDispatcher == null)
+            {
+                try
+                {
+                    uiDispatcher = CoreApplication.MainView?.CoreWindow?.Dispatcher;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[AndroidRenderSurface] Dispatcher resolution failed ({ex.GetType().Name}): {ex.Message}");
+                }
+            }
         }
 
         public AndroidRenderSurface(double width, double height) : this()
