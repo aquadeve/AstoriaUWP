@@ -43,7 +43,9 @@ namespace AndroidInteropLib.android.widget
 
         public int getDuration()
         {
-            return (int)mediaElement.NaturalDuration.TimeSpan.TotalMilliseconds;
+            if (mediaElement.NaturalDuration.HasTimeSpan)
+                return (int)mediaElement.NaturalDuration.TimeSpan.TotalMilliseconds;
+            return 0;
         }
 
         public int getCurrentPosition()
