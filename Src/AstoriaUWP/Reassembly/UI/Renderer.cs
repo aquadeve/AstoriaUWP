@@ -1203,6 +1203,372 @@ namespace DalvikUWPCSharp.Reassembly.UI
                 return asb;
             }
 
+            // ── SearchView ───────────────────────────────────────────────────────
+            else if (xeName == "SearchView"
+                  || xeName == "android.widget.SearchView"
+                  || xeName == "androidx.appcompat.widget.SearchView")
+            {
+                AutoSuggestBox searchBox = new AutoSuggestBox();
+                searchBox.QueryIcon = new SymbolIcon(Symbol.Find);
+                if (xe.Attribute(p1nspace + "queryHint") != null)
+                    searchBox.PlaceholderText = xe.Attribute(p1nspace + "queryHint").Value;
+                ApplyCommonAttributes(searchBox, xe);
+                return searchBox;
+            }
+
+            // ── Chronometer ──────────────────────────────────────────────────────
+            else if (xeName == "Chronometer" || xeName == "android.widget.Chronometer")
+            {
+                TextBlock chrono = new TextBlock();
+                chrono.Text = "00:00";
+                if (xe.Attribute(p1nspace + "format") != null)
+                    chrono.Text = xe.Attribute(p1nspace + "format").Value;
+                ApplyCommonAttributes(chrono, xe);
+                return chrono;
+            }
+
+            // ── TextClock ────────────────────────────────────────────────────────
+            else if (xeName == "TextClock" || xeName == "android.widget.TextClock")
+            {
+                TextBlock clock = new TextBlock();
+                clock.Text = "12:00 AM";
+                if (xe.Attribute(p1nspace + "format12Hour") != null)
+                    clock.Text = xe.Attribute(p1nspace + "format12Hour").Value;
+                else if (xe.Attribute(p1nspace + "format24Hour") != null)
+                    clock.Text = xe.Attribute(p1nspace + "format24Hour").Value;
+                ApplyCommonAttributes(clock, xe);
+                return clock;
+            }
+
+            // ── ExpandableListView ───────────────────────────────────────────────
+            else if (xeName == "ExpandableListView" || xeName == "android.widget.ExpandableListView")
+            {
+                Windows.UI.Xaml.Controls.ListView elv = new Windows.UI.Xaml.Controls.ListView();
+                ApplyCommonAttributes(elv, xe);
+                return elv;
+            }
+
+            // ── AbsoluteLayout ───────────────────────────────────────────────────
+            else if (xeName == "AbsoluteLayout" || xeName == "android.widget.AbsoluteLayout")
+            {
+                Canvas canvas = new Canvas();
+                ApplyCommonAttributes(canvas, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) canvas.Children.Add(child);
+                    }
+                return canvas;
+            }
+
+            // ── Gallery ──────────────────────────────────────────────────────────
+            else if (xeName == "Gallery" || xeName == "android.widget.Gallery")
+            {
+                FlipView gallery = new FlipView();
+                ApplyCommonAttributes(gallery, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) gallery.Items.Add(child);
+                    }
+                return gallery;
+            }
+
+            // ── MediaController ──────────────────────────────────────────────────
+            else if (xeName == "MediaController" || xeName == "android.widget.MediaController")
+            {
+                StackPanel mc = new StackPanel();
+                mc.Orientation = Orientation.Horizontal;
+                mc.HorizontalAlignment = HorizontalAlignment.Center;
+                mc.Children.Add(new Button { Content = "⏮" });
+                mc.Children.Add(new Button { Content = "▶" });
+                mc.Children.Add(new Button { Content = "⏭" });
+                ApplyCommonAttributes(mc, xe);
+                return mc;
+            }
+
+            // ── ZoomControls ─────────────────────────────────────────────────────
+            else if (xeName == "ZoomControls" || xeName == "android.widget.ZoomControls")
+            {
+                StackPanel zc = new StackPanel();
+                zc.Orientation = Orientation.Horizontal;
+                zc.Children.Add(new Button { Content = "-" });
+                zc.Children.Add(new Button { Content = "+" });
+                ApplyCommonAttributes(zc, xe);
+                return zc;
+            }
+
+            // ── TabHost ──────────────────────────────────────────────────────────
+            else if (xeName == "TabHost" || xeName == "android.widget.TabHost")
+            {
+                Pivot tabHost = new Pivot();
+                ApplyCommonAttributes(tabHost, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) tabHost.Items.Add(child);
+                    }
+                return tabHost;
+            }
+
+            // ── TabWidget ────────────────────────────────────────────────────────
+            else if (xeName == "TabWidget" || xeName == "android.widget.TabWidget")
+            {
+                StackPanel tw = new StackPanel();
+                tw.Orientation = Orientation.Horizontal;
+                ApplyCommonAttributes(tw, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) tw.Children.Add(child);
+                    }
+                return tw;
+            }
+
+            // ── SwipeRefreshLayout ───────────────────────────────────────────────
+            else if (xeName == "androidx.swiperefreshlayout.widget.SwipeRefreshLayout"
+                  || xeName == "android.support.v4.widget.SwipeRefreshLayout")
+            {
+                Grid srl = new Grid();
+                ApplyCommonAttributes(srl, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) srl.Children.Add(child);
+                    }
+                return srl;
+            }
+
+            // ── CollapsingToolbarLayout ──────────────────────────────────────────
+            else if (xeName == "android.support.design.widget.CollapsingToolbarLayout"
+                  || xeName == "com.google.android.material.appbar.CollapsingToolbarLayout")
+            {
+                Grid ctl = new Grid();
+                ApplyCommonAttributes(ctl, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) ctl.Children.Add(child);
+                    }
+                return ctl;
+            }
+
+            // ── ExtendedFloatingActionButton ─────────────────────────────────────
+            else if (xeName == "com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton")
+            {
+                Button efab = new Button();
+                efab.CornerRadius = new CornerRadius(28);
+                efab.Padding = new Thickness(16, 0, 16, 0);
+                if (xe.Attribute(p1nspace + "text") != null)
+                    efab.Content = xe.Attribute(p1nspace + "text").Value;
+                else
+                    efab.Content = "+";
+                ApplyCommonAttributes(efab, xe);
+                return efab;
+            }
+
+            // ── MaterialCardView ─────────────────────────────────────────────────
+            else if (xeName == "com.google.android.material.card.MaterialCardView")
+            {
+                Border mCard = new Border();
+                mCard.CornerRadius = new CornerRadius(4);
+                mCard.Margin = new Thickness(8);
+                mCard.Padding = new Thickness(8);
+                mCard.Background = new SolidColorBrush(Windows.UI.Colors.White);
+                if (xe.Attribute(p1nspace + "background") != null)
+                    try { mCard.Background = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value)); } catch { }
+                if (xe.Attribute("{http://schemas.android.com/apk/res-auto}cardCornerRadius") != null
+                    && double.TryParse(xe.Attribute("{http://schemas.android.com/apk/res-auto}cardCornerRadius").Value, out var mcr))
+                    mCard.CornerRadius = new CornerRadius(mcr);
+                Grid mCardContent = new Grid();
+                mCard.Child = mCardContent;
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) mCardContent.Children.Add(child);
+                    }
+                ApplyCommonAttributes(mCard, xe);
+                return mCard;
+            }
+
+            // ── MaterialSlider / RangeSlider ─────────────────────────────────────
+            else if (xeName == "com.google.android.material.slider.Slider"
+                  || xeName == "com.google.android.material.slider.RangeSlider")
+            {
+                Slider mSlider = new Slider();
+                string appNs = "{http://schemas.android.com/apk/res-auto}";
+                if (xe.Attribute(appNs + "valueFrom") != null
+                    && double.TryParse(xe.Attribute(appNs + "valueFrom").Value, out var vf))
+                    mSlider.Minimum = vf;
+                else if (xe.Attribute(p1nspace + "valueFrom") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "valueFrom").Value, out var vf2))
+                    mSlider.Minimum = vf2;
+                if (xe.Attribute(appNs + "valueTo") != null
+                    && double.TryParse(xe.Attribute(appNs + "valueTo").Value, out var vt))
+                    mSlider.Maximum = vt;
+                else if (xe.Attribute(p1nspace + "valueTo") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "valueTo").Value, out var vt2))
+                    mSlider.Maximum = vt2;
+                if (xe.Attribute(appNs + "value") != null
+                    && double.TryParse(xe.Attribute(appNs + "value").Value, out var sv))
+                    mSlider.Value = sv;
+                else if (xe.Attribute(p1nspace + "value") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "value").Value, out var sv2))
+                    mSlider.Value = sv2;
+                ApplyCommonAttributes(mSlider, xe);
+                return mSlider;
+            }
+
+            // ── BottomAppBar ─────────────────────────────────────────────────────
+            else if (xeName == "com.google.android.material.bottomappbar.BottomAppBar")
+            {
+                CommandBar bab = new CommandBar();
+                bab.VerticalAlignment = VerticalAlignment.Bottom;
+                bab.HorizontalAlignment = HorizontalAlignment.Stretch;
+                ApplyCommonAttributes(bab, xe);
+                return bab;
+            }
+
+            // ── FragmentContainerView ────────────────────────────────────────────
+            else if (xeName == "androidx.fragment.app.FragmentContainerView")
+            {
+                Grid fcv = new Grid();
+                ApplyCommonAttributes(fcv, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) fcv.Children.Add(child);
+                    }
+                return fcv;
+            }
+
+            // ── fragment ─────────────────────────────────────────────────────────
+            else if (xeName == "fragment")
+            {
+                Grid frag = new Grid();
+                ApplyCommonAttributes(frag, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) frag.Children.Add(child);
+                    }
+                return frag;
+            }
+
+            // ── MotionLayout ─────────────────────────────────────────────────────
+            else if (xeName == "androidx.constraintlayout.motion.widget.MotionLayout")
+            {
+                Grid ml = new Grid();
+                ApplyCommonAttributes(ml, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) ml.Children.Add(child);
+                    }
+                return ml;
+            }
+
+            // ── View (divider) ───────────────────────────────────────────────────
+            else if (xeName == "View" || xeName == "android.view.View")
+            {
+                Border divider = new Border();
+                divider.Height = 1;
+                divider.HorizontalAlignment = HorizontalAlignment.Stretch;
+                divider.Background = new SolidColorBrush(Windows.UI.Colors.Gray);
+                if (xe.Attribute(p1nspace + "background") != null)
+                    try { divider.Background = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "background").Value)); } catch { }
+                if (xe.Attribute(p1nspace + "layout_height") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "layout_height").Value, out var dh) && dh > 0)
+                    divider.Height = dh;
+                ApplyCommonAttributes(divider, xe);
+                return divider;
+            }
+
+            // ── ImageSwitcher ────────────────────────────────────────────────────
+            else if (xeName == "ImageSwitcher" || xeName == "android.widget.ImageSwitcher")
+            {
+                Grid imgSwitch = new Grid();
+                ApplyCommonAttributes(imgSwitch, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) imgSwitch.Children.Add(child);
+                    }
+                return imgSwitch;
+            }
+
+            // ── TextSwitcher ─────────────────────────────────────────────────────
+            else if (xeName == "TextSwitcher" || xeName == "android.widget.TextSwitcher")
+            {
+                Grid txtSwitch = new Grid();
+                ApplyCommonAttributes(txtSwitch, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) txtSwitch.Children.Add(child);
+                    }
+                return txtSwitch;
+            }
+
+            // ── StackView ────────────────────────────────────────────────────────
+            else if (xeName == "StackView" || xeName == "android.widget.StackView")
+            {
+                FlipView stackView = new FlipView();
+                ApplyCommonAttributes(stackView, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) stackView.Items.Add(child);
+                    }
+                return stackView;
+            }
+
+            // ── AdapterViewFlipper ───────────────────────────────────────────────
+            else if (xeName == "AdapterViewFlipper" || xeName == "android.widget.AdapterViewFlipper")
+            {
+                FlipView avf = new FlipView();
+                ApplyCommonAttributes(avf, xe);
+                if (nestedObjs)
+                    foreach (XElement xe1 in xe.Elements())
+                    {
+                        var child = await RenderObject(xe1);
+                        if (child != null) avf.Items.Add(child);
+                    }
+                return avf;
+            }
+
+            // ── AnalogClock ──────────────────────────────────────────────────────
+            else if (xeName == "AnalogClock" || xeName == "android.widget.AnalogClock")
+            {
+                TextBlock analogClock = new TextBlock();
+                analogClock.Text = "🕐";
+                analogClock.FontSize = 48;
+                ApplyCommonAttributes(analogClock, xe);
+                return analogClock;
+            }
+
+            // ── DigitalClock ─────────────────────────────────────────────────────
+            else if (xeName == "DigitalClock" || xeName == "android.widget.DigitalClock")
+            {
+                TextBlock digitalClock = new TextBlock();
+                digitalClock.Text = "12:00:00";
+                ApplyCommonAttributes(digitalClock, xe);
+                return digitalClock;
+            }
+
             // ── Unrecognised element placeholder ─────────────────────────────────
             else
             {
