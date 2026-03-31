@@ -80,16 +80,35 @@ namespace DalvikUWPCSharp.FLinux.Cpu
         public async Task RunAsync()
         {
             _running = true;
+            Debug.WriteLine($"[Arm64CPU] RunAsync starting – initial PC=0x{_pc:X16} SP=0x{_sp:X16}");
+            string exitReason = "unknown";
             await Task.Run(() =>
             {
-                while (_running && !_process.Exited)
+                try
                 {
-                    if (!Step()) break;
-                    if (_instructionCount % 100_000 == 0)
-                        Debug.WriteLine($"[Arm64CPU] {_instructionCount} instr PC=0x{_pc:X16}");
+                    while (_running && !_process.Exited)
+                    {
+                        if (!Step())
+                        {
+                            exitReason = $"Step() returned false at PC=0x{_pc:X16} after {_instructionCount} instructions";
+                            break;
+                        }
+                        if (_instructionCount % 100_000 == 0)
+                            Debug.WriteLine($"[Arm64CPU] {_instructionCount} instr PC=0x{_pc:X16}");
+                    }
+                    if (_process.Exited && exitReason == "unknown")
+                        exitReason = $"process marked Exited at PC=0x{_pc:X16} after {_instructionCount} instructions";
+                    if (!_running && exitReason == "unknown")
+                        exitReason = $"_running cleared externally at PC=0x{_pc:X16} after {_instructionCount} instructions";
+                }
+                catch (Exception ex)
+                {
+                    exitReason = $"unhandled exception '{ex.GetType().Name}' at PC=0x{_pc:X16}: {ex.Message}";
+                    Debug.WriteLine($"[Arm64CPU] Exception in run loop: {ex}");
                 }
             });
-            Debug.WriteLine($"[Arm64CPU] Finished after {_instructionCount} instructions.");
+            Debug.WriteLine($"[Arm64CPU] Execution finished – reason: {exitReason}");
+            Debug.WriteLine($"[Arm64CPU] Final state: PC=0x{_pc:X16} SP=0x{_sp:X16} instructions={_instructionCount}");
         }
 
         public bool Step()

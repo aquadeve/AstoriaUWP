@@ -24,6 +24,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.UI.Core;
 using Windows.UI.Xaml;
 
 namespace DalvikUWPCSharp.Classes
@@ -90,6 +91,14 @@ namespace DalvikUWPCSharp.Classes
         // String pool cache: resource ID -> string value (populated from DEX string table)
         private Dictionary<int, string> stringResources = new Dictionary<int, string>();
 
+        // GLSurfaceView.Renderer object (app-supplied; typically a DalvikObject).
+        // Stored so we can call onSurfaceCreated / onSurfaceChanged / onDrawFrame.
+        private object glRendererObject;
+        private Class  glRendererClass;
+
+        // DispatcherTimer that drives the GL render loop (~60 fps).
+        private DispatcherTimer glRenderTimer;
+
         public DalvikCPU(Dex d, string pName, EmuPage hostPg)
         {
             dex = d;
@@ -153,6 +162,7 @@ namespace DalvikUWPCSharp.Classes
 
         public async Task Start()
         {
+            Debug.WriteLine("[DalvikCPU] Start() – beginning app emulation.");
             if (appContext == null)
             {
                 appContext = new AstoriaContext(da, await AstoriaResources.CreateAsync(da));
@@ -161,7 +171,9 @@ namespace DalvikUWPCSharp.Classes
             }
 
             // Scan for native libraries in the APK (apkenv-inspired)
+            Debug.WriteLine("[DalvikCPU] Start() – scanning native libraries.");
             await ScanNativeLibraries();
+            Debug.WriteLine("[DalvikCPU] Start() – native library scan complete.");
 
             // Determine the main activity class to launch.
             // Prefer the launcher activity from AndroidManifest; fall back to "<package>.MainActivity".
@@ -201,6 +213,8 @@ namespace DalvikUWPCSharp.Classes
             if (!foundActivity)
                 Debug.WriteLine("[DalvikCPU] WARNING: MainActivity (" + mainActivityClass + ") not found in DEX.");
 
+            Debug.WriteLine("[DalvikCPU] Start() – app initialisation complete. GL renderer=" +
+                (glRendererClass?.Name ?? (glRendererObject != null ? glRendererObject.GetType().Name : "none")));
             hostPage.preloadDone();
         }
 
@@ -208,6 +222,116 @@ namespace DalvikUWPCSharp.Classes
         {
             var dialog = new Windows.UI.Popups.MessageDialog("Back event initiated.", "Dalvik CPU");
             await dialog.ShowAsync();
+        }
+
+        /// <summary>
+        /// Dispatches an Android MotionEvent-style touch to the running app.
+        /// Called by EmuPage when the user touches the AndroidRenderSurface.
+        /// <paramref name="action"/> is one of <see cref="MotionEventActions"/>
+        /// (0=DOWN, 1=UP, 2=MOVE, 3=CANCEL).
+        /// </summary>
+        public void DispatchTouchEvent(float x, float y, int action)
+        {
+            Debug.WriteLine($"[DalvikCPU] DispatchTouchEvent action={action} x={x:F1} y={y:F1}");
+            try
+            {
+                // Walk all classes looking for onTouchEvent or dispatchTouchEvent.
+                foreach (Class cl in dex.GetClasses())
+                {
+                    foreach (Method m in cl.GetMethods())
+                    {
+                        if (m.Name == "onTouchEvent" || m.Name == "dispatchTouchEvent")
+                        {
+                            // Build a DalvikObject representing MotionEvent
+                            var motionEvent = new DalvikObject("android.view.MotionEvent");
+                            motionEvent.Properties["action"] = action;
+                            motionEvent.Properties["x"]      = x;
+                            motionEvent.Properties["y"]      = y;
+                            motionEvent.Properties["rawX"]   = x;
+                            motionEvent.Properties["rawY"]   = y;
+                            Debug.WriteLine($"[DalvikCPU]   Calling {cl.Name}.{m.Name}");
+                            RunMethod(m, cl, motionEvent);
+                            return; // deliver to first handler found
+                        }
+                    }
+                }
+                Debug.WriteLine("[DalvikCPU] DispatchTouchEvent: no onTouchEvent/dispatchTouchEvent found in DEX.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[DalvikCPU] DispatchTouchEvent error: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Starts the GL render loop: calls onSurfaceCreated → onSurfaceChanged, then
+        /// fires onDrawFrame at ~60 fps via a DispatcherTimer.
+        /// </summary>
+        private void StartGLRenderLoop(object rendererObj, Class rendererCls)
+        {
+            Debug.WriteLine("[DalvikCPU] StartGLRenderLoop – initialising GL render callbacks.");
+
+            // Call onSurfaceCreated(GL10 gl, EGLConfig config) – both args are stubs.
+            CallRendererMethod(rendererObj, rendererCls, "onSurfaceCreated",
+                new DalvikObject("javax.microedition.khronos.opengles.GL10"),
+                new DalvikObject("javax.microedition.khronos.egl.EGLConfig"));
+
+            // Call onSurfaceChanged(GL10 gl, int width, int height).
+            int surfaceW = (int)(AndroidRenderSurface.Current?.GetWidth()  ?? 1280);
+            int surfaceH = (int)(AndroidRenderSurface.Current?.GetHeight() ?? 720);
+            Debug.WriteLine($"[DalvikCPU] onSurfaceChanged: {surfaceW}x{surfaceH}");
+            CallRendererMethod(rendererObj, rendererCls, "onSurfaceChanged",
+                new DalvikObject("javax.microedition.khronos.opengles.GL10"),
+                surfaceW, surfaceH);
+
+            // Set up DispatcherTimer to call onDrawFrame at ~60 fps.
+            if (glRenderTimer != null)
+            {
+                glRenderTimer.Stop();
+                glRenderTimer = null;
+            }
+            glRenderTimer = new DispatcherTimer();
+            glRenderTimer.Interval = TimeSpan.FromMilliseconds(16); // ~60 fps
+            glRenderTimer.Tick += (s, e) =>
+            {
+                try
+                {
+                    CallRendererMethod(rendererObj, rendererCls, "onDrawFrame",
+                        new DalvikObject("javax.microedition.khronos.opengles.GL10"));
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[DalvikCPU] onDrawFrame error: " + ex.Message);
+                }
+            };
+            glRenderTimer.Start();
+            Debug.WriteLine("[DalvikCPU] GL render loop started (DispatcherTimer ~60fps).");
+        }
+
+        /// <summary>
+        /// Looks up <paramref name="methodName"/> in the renderer class and invokes it.
+        /// </summary>
+        private void CallRendererMethod(object rendererObj, Class rendererCls, string methodName, params object[] args)
+        {
+            if (rendererCls == null) return;
+            foreach (Method m in rendererCls.GetMethods())
+            {
+                if (m.Name == methodName)
+                {
+                    RunMethod(m, rendererCls, args);
+                    return;
+                }
+            }
+            // Method not found in this class – log but don't crash.
+            Debug.WriteLine($"[DalvikCPU] CallRendererMethod: {methodName} not found in {rendererCls?.Name ?? "?"}");
+        }
+
+        /// <summary>
+        /// Handler for AndroidRenderSurface.TouchEvent – forwards touch events to the app.
+        /// </summary>
+        private void OnRenderSurfaceTouch(float x, float y, int action)
+        {
+            DispatchTouchEvent(x, y, action);
         }
 
         // RunMethod with PC-based execution loop supporting branches
@@ -1594,7 +1718,61 @@ namespace DalvikUWPCSharp.Classes
             // ── GLSurfaceView methods ────────────────────────────────────
             if (m.Name == "setRenderer")
             {
-                Debug.WriteLine("[DalvikCPU] GLSurfaceView.setRenderer called");
+                object rendererArg = obj != null && obj.Length > 0 ? obj[0] : null;
+                Debug.WriteLine($"[DalvikCPU] GLSurfaceView.setRenderer called – renderer={rendererArg?.GetType().Name ?? "null"}");
+
+                // Store the renderer so we can call lifecycle callbacks.
+                glRendererObject = rendererArg;
+                glRendererClass  = null;
+
+                if (rendererArg is DalvikObject dalvikRenderer)
+                {
+                    // Find the Dalvik class for this renderer so we can call DEX methods on it.
+                    foreach (Class cl in dex.GetClasses())
+                    {
+                        if (cl.Name == dalvikRenderer.TypeName)
+                        {
+                            glRendererClass = cl;
+                            break;
+                        }
+                    }
+                    Debug.WriteLine($"[DalvikCPU] GLSurfaceView.setRenderer – DEX class found: {glRendererClass?.Name ?? "(not in DEX)"}");
+                }
+
+                // Ensure a render surface exists before starting the render loop.
+                if (AndroidRenderSurface.Current == null)
+                {
+                    var surface = new AndroidRenderSurface();
+                    surface.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    surface.VerticalAlignment   = VerticalAlignment.Stretch;
+                    AndroidRenderSurface.Current = surface;
+                    hostPage.SetNativeRenderSurface(surface);
+                    Debug.WriteLine("[DalvikCPU] GLSurfaceView.setRenderer – created native render surface.");
+                }
+
+                // Wire touch events on the render surface to DispatchTouchEvent.
+                if (AndroidRenderSurface.Current != null)
+                {
+                    AndroidRenderSurface.Current.TouchEvent -= OnRenderSurfaceTouch; // avoid double-subscribe
+                    AndroidRenderSurface.Current.TouchEvent += OnRenderSurfaceTouch;
+                    Debug.WriteLine("[DalvikCPU] GLSurfaceView.setRenderer – touch events wired to render surface.");
+                }
+
+                // Start the GL render loop on the UI thread.
+                // TryNativeMethod is synchronous so we use fire-and-forget dispatch here;
+                // StartGLRenderLoop only sets up a DispatcherTimer and won't throw uncaught.
+                if (glRendererClass != null)
+                {
+                    _ = hostPage.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                    {
+                        StartGLRenderLoop(glRendererObject, glRendererClass);
+                    });
+                }
+                else
+                {
+                    Debug.WriteLine("[DalvikCPU] GLSurfaceView.setRenderer – renderer class not in DEX, skipping render loop (JNI path).");
+                }
+
                 return true;
             }
             if (m.Name == "setEGLContextClientVersion")
@@ -1612,6 +1790,14 @@ namespace DalvikUWPCSharp.Classes
             }
             if (m.Name == "requestRender" || m.Name == "queueEvent")
             {
+                // requestRender: in RENDERMODE_WHEN_DIRTY this triggers a single frame.
+                // When the render timer is running this is a no-op; otherwise fire a single frame.
+                if (m.Name == "requestRender" && glRendererClass != null && glRenderTimer == null)
+                {
+                    Debug.WriteLine("[DalvikCPU] requestRender – triggering single onDrawFrame");
+                    CallRendererMethod(glRendererObject, glRendererClass, "onDrawFrame",
+                        new DalvikObject("javax.microedition.khronos.opengles.GL10"));
+                }
                 return true;
             }
 

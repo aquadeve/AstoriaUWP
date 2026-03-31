@@ -224,6 +224,14 @@ namespace DalvikUWPCSharp
             surface.HorizontalAlignment = HorizontalAlignment.Stretch;
             surface.VerticalAlignment = VerticalAlignment.Stretch;
             DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = surface;
+
+            // Wire touch events so pointer input on this surface reaches the emulated app.
+            if (cpu != null)
+            {
+                surface.TouchEvent += cpu.DispatchTouchEvent;
+                Debug.WriteLine("[EmuPage] TryCreateNativeRenderSurface – touch events wired to DalvikCPU.");
+            }
+
             RenderTargetGrid.Children.Add(surface);
             return true;
         }
@@ -358,6 +366,15 @@ namespace DalvikUWPCSharp
         {
             Debug.WriteLine("[EmuPage] SetNativeRenderSurface called.");
             DalvikUWPCSharp.Reassembly.UI.AndroidRenderSurface.Current = surface;
+
+            // Wire touch events so pointer input on the surface is forwarded to the emulated app.
+            if (cpu != null)
+            {
+                surface.TouchEvent -= cpu.DispatchTouchEvent; // avoid duplicate subscription
+                surface.TouchEvent += cpu.DispatchTouchEvent;
+                Debug.WriteLine("[EmuPage] SetNativeRenderSurface – touch events wired to DalvikCPU.");
+            }
+
             ReplaceRenderTargetOnUIThread(surface);
         }//SetNativeRenderSurface end
 
