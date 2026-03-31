@@ -47,7 +47,7 @@
                                             </Storyboard>
                                         </VisualTransition>
                                     </VisualStateGroup.Transitions>
-                                    
+
                                     <VisualState x:Name="Normal">
                                         <Storyboard>
                                             <PointerUpThemeAnimation Storyboard.TargetName="RootGrid"/>
@@ -117,7 +117,7 @@
         <Viewbox x:Name="RenderTargetBox" Stretch="Uniform"/>
 
         <Grid x:Name="RenderTargetGrid" Background="Transparent"/>
-        <Grid x:Name="PreSplashGrid" Background="{ThemeResource SystemControlPageBackgroundChromeLowBrush}">
+        <Grid x:Name="PreSplashGrid">
             <Grid Height="400">
                 <Image x:Name="appImage" HorizontalAlignment="Center" Height="100" VerticalAlignment="Top" Width="100" Margin="0" Source="Assets/Square150x150Logo.png"/>
                 <TextBlock x:Name="statusTextblock" HorizontalAlignment="Center" Margin="0,145,0,0" TextWrapping="Wrap" Text="Loading..." VerticalAlignment="Top" FontSize="18.667"/>
