@@ -1,2 +1,0 @@
-# AndroidLibs
-Prebuilt Android libs
