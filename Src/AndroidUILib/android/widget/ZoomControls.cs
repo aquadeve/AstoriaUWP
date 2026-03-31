@@ -13,13 +13,15 @@ namespace AndroidInteropLib.android.widget
     public class ZoomControls : LinearLayout
     {
         private StackPanel panel = new StackPanel { Orientation = Orientation.Horizontal };
-        private Button zoomIn = new Button { Content = "+" };
-        private Button zoomOut = new Button { Content = "-" };
+        private Button zoomIn = new Button();
+        private Button zoomOut = new Button();
 
         public ZoomControls(Context c, AttributeSet a) : base(c, a) { }
 
         public override void CreateWinUI(params object[] obj)
         {
+            zoomOut.setText("-");
+            zoomIn.setText("+");
             panel.Children.Add(zoomOut);
             panel.Children.Add(zoomIn);
             WinUI.Content = panel;

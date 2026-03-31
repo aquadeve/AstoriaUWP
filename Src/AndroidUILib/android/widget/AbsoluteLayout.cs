@@ -25,9 +25,16 @@ namespace AndroidInteropLib.android.widget
 
         public override void addView(View view) { addView(view, null); }
 
-        public override void addView(View view, LayoutParams param)
+        public override void addView(View view, ViewGroup.LayoutParams param)
         {
             canvas.Children.Add(view.WinUI);
+            
+            // If the param is an AbsoluteLayout.LayoutParams, set the position
+            if (param is LayoutParams absoluteParams)
+            {
+                Canvas.SetLeft(view.WinUI, absoluteParams.x);
+                Canvas.SetTop(view.WinUI, absoluteParams.y);
+            }
         }
 
         public override void removeView(View view)

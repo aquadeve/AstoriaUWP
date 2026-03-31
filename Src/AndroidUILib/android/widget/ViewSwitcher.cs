@@ -53,14 +53,14 @@ namespace AndroidInteropLib.android.widget
 
         public override void addView(View view, LayoutParams param)
         {
-            container.Children.Add(view);
+            container.Children.Add(view.WinUI);
             if (container.Children.Count > 1)
-                view.Visibility = Visibility.Collapsed;
+                view.WinUI.Visibility = Visibility.Collapsed;
         }
 
         public override void removeView(View view)
         {
-            container.Children.Remove(view);
+            container.Children.Remove(view.WinUI);
         }
     }
 }
