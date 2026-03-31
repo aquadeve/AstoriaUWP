@@ -219,6 +219,9 @@
     <Compile Include="FLinux\Syscalls\SyscallNumbers.cs" />
     <Compile Include="FLinux\Syscalls\SyscallDispatcher.cs" />
     <Compile Include="FLinux\ElfExecutor.cs" />
+    <Compile Include="ApkConverterPage.xaml.cs">
+      <DependentUpon>ApkConverterPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="EmuPage.xaml.cs">
       <DependentUpon>EmuPage.xaml</DependentUpon>
     </Compile>
@@ -337,6 +340,10 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Page Include="DroidAppLoadingPopup.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ApkConverterPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

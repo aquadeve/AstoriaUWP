@@ -305,5 +305,10 @@ namespace DalvikUWPCSharp
         {
             Frame.Navigate(typeof(SettingsPage));
         }
+
+        private void apkConverterButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(ApkConverterPage));
+        }
     }
 }

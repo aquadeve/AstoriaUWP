@@ -35,6 +35,7 @@
     <Page.BottomAppBar>
         <CommandBar>
             <AppBarButton x:Name="chooseFileButton" Label="File Picker (Experimental)" Icon="OpenFile" Click="chooseFileButton_Click" />
+            <AppBarButton x:Name="apkConverterButton" Label="APK Converter" Icon="Sync" Click="apkConverterButton_Click" />
             <AppBarButton x:Name="purgeButton" Label="Purge apps folder" Icon="Admin" Click="purgeButton_Click" />
             <AppBarButton x:Name="settingsButton" Label="Settings" Icon="Setting" Click="settingsButton_Click" />
         </CommandBar>
