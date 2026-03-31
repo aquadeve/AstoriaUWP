@@ -449,12 +449,6 @@ namespace DalvikUWPCSharp.Reassembly.UI
                     tv.Text = xe.Attribute(p1nspace + "text").Value;
                 if (xe.Attribute(p1nspace + "hint") != null && string.IsNullOrEmpty(tv.Text))
                     tv.Text = xe.Attribute(p1nspace + "hint").Value;
-                if (xe.Attribute(p1nspace + "layout_width") != null
-                    && double.TryParse(xe.Attribute(p1nspace + "layout_width").Value, out var tvw))
-                    tv.Width = tvw;
-                if (xe.Attribute(p1nspace + "layout_height") != null
-                    && double.TryParse(xe.Attribute(p1nspace + "layout_height").Value, out var tvh))
-                    tv.Height = tvh;
                 if (xe.Attribute(p1nspace + "textColor") != null)
                     try { tv.Foreground = new SolidColorBrush(ColorUtil.FromString(xe.Attribute(p1nspace + "textColor").Value)); } catch { }
                 if (xe.Attribute(p1nspace + "textSize") != null
@@ -476,11 +470,7 @@ namespace DalvikUWPCSharp.Reassembly.UI
                 if (xe.Attribute(p1nspace + "maxLines") != null
                     && int.TryParse(xe.Attribute(p1nspace + "maxLines").Value, out var maxl))
                     tv.MaxLines = maxl;
-                if (xe.Attribute(p1nspace + "visibility") != null)
-                {
-                    string vis = xe.Attribute(p1nspace + "visibility").Value.ToLower();
-                    tv.Visibility = (vis == "gone" || vis == "invisible") ? Visibility.Collapsed : Visibility.Visible;
-                }
+                ApplyCommonAttributes(tv, xe);
                 return tv;
             }
 

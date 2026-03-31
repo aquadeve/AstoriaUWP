@@ -114,11 +114,47 @@ namespace AndroidXml
             if (_parser.EventCode != ResXMLParser.XmlParserEventCode.START_TAG) return null;
             ResXMLParser.AttributeInfo attr = _parser.GetAttribute(i < 0 ? null : (uint?) i);
             if (attr == null) throw new ArgumentOutOfRangeException("i");
+            return FormatAttributeValue(attr);
+        }
+
+        private string FormatAttributeValue(ResXMLParser.AttributeInfo attr)
+        {
             if (attr.ValueStringID != null)
             {
                 return attr.ValueString;
             }
-            return FormatValue(attr.TypedValue);
+
+            string formattedValue = FormatValue(attr.TypedValue);
+            if (attr.Name == null)
+            {
+                return formattedValue;
+            }
+
+            switch (attr.TypedValue.DataType)
+            {
+                case Res.ValueType.TYPE_INT_DEC:
+                case Res.ValueType.TYPE_INT_HEX:
+                    switch (attr.Name)
+                    {
+                        case "layout_width":
+                        case "layout_height":
+                            if (attr.TypedValue.IntValue == -1) return "match_parent";
+                            if (attr.TypedValue.IntValue == -2) return "wrap_content";
+                            break;
+                        case "orientation":
+                            if (attr.TypedValue.IntValue == 0) return "horizontal";
+                            if (attr.TypedValue.IntValue == 1) return "vertical";
+                            break;
+                        case "visibility":
+                            if (attr.TypedValue.IntValue == 0) return "visible";
+                            if (attr.TypedValue.IntValue == 1) return "invisible";
+                            if (attr.TypedValue.IntValue == 2) return "gone";
+                            break;
+                    }
+                    break;
+            }
+
+            return formattedValue;
         }
 
         private string FormatValue(Res_value value)
@@ -248,7 +284,7 @@ namespace AndroidXml
                     prefix: LookupPrefix(ns),
                     localName: attr.Name,
                     namespaceUri: ns,
-                    value: attr.ValueStringID != null ? attr.ValueString : FormatValue(attr.TypedValue));
+                    value: FormatAttributeValue(attr));
             }
             return true;
         }
