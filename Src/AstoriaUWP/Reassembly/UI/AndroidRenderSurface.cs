@@ -8,13 +8,26 @@ using Windows.ApplicationModel.Core;
 using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Core;
+using Windows.UI.Input;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Shapes;
 
 namespace DalvikUWPCSharp.Reassembly.UI
 {
+    /// <summary>
+    /// Android MotionEvent action constants (mirrors android.view.MotionEvent).
+    /// </summary>
+    public static class MotionEventActions
+    {
+        public const int ACTION_DOWN   = 0;
+        public const int ACTION_UP     = 1;
+        public const int ACTION_MOVE   = 2;
+        public const int ACTION_CANCEL = 3;
+    }
+
     /// <summary>
     /// A UWP Canvas-based surface that emulates Android's Canvas drawing operations.
     /// This provides the rendering pipeline for Android apps running on UWP,
@@ -42,6 +55,14 @@ namespace DalvikUWPCSharp.Reassembly.UI
         // Dispatcher captured at construction time (UI thread) for safe cross-thread updates.
         private CoreDispatcher uiDispatcher;
 
+        /// <summary>
+        /// Fired when the user touches (or clicks) the surface.
+        /// Arguments are (x, y, androidAction) where androidAction is one of
+        /// <see cref="MotionEventActions"/>.ACTION_DOWN/UP/MOVE.
+        /// Can be subscribed to by EmuPage or DalvikCPU to forward events to Android.
+        /// </summary>
+        public event Action<float, float, int> TouchEvent;
+
         public AndroidRenderSurface()
         {
             renderCanvas = new Canvas();
@@ -62,6 +83,14 @@ namespace DalvikUWPCSharp.Reassembly.UI
                     Debug.WriteLine($"[AndroidRenderSurface] Dispatcher resolution failed ({ex.GetType().Name}): {ex.Message}");
                 }
             }
+
+            // Enable pointer/touch input so this surface can receive tap/drag events.
+            this.IsHitTestVisible = true;
+            this.PointerPressed  += OnPointerPressed;
+            this.PointerReleased += OnPointerReleased;
+            this.PointerMoved    += OnPointerMoved;
+            this.PointerCanceled += OnPointerCanceled;
+            Debug.WriteLine("[AndroidRenderSurface] Touch input enabled.");
         }
 
         public AndroidRenderSurface(double width, double height) : this()
@@ -76,6 +105,49 @@ namespace DalvikUWPCSharp.Reassembly.UI
         {
             canvasWidth = e.NewSize.Width;
             canvasHeight = e.NewSize.Height;
+        }
+
+        // ── Touch / pointer event handlers ───────────────────────────────────
+
+        private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            var point = e.GetCurrentPoint(this);
+            float x = (float)point.Position.X;
+            float y = (float)point.Position.Y;
+            Debug.WriteLine($"[AndroidRenderSurface] Touch DOWN at ({x:F1},{y:F1})");
+            TouchEvent?.Invoke(x, y, MotionEventActions.ACTION_DOWN);
+            e.Handled = true;
+        }
+
+        private void OnPointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            var point = e.GetCurrentPoint(this);
+            float x = (float)point.Position.X;
+            float y = (float)point.Position.Y;
+            Debug.WriteLine($"[AndroidRenderSurface] Touch UP at ({x:F1},{y:F1})");
+            TouchEvent?.Invoke(x, y, MotionEventActions.ACTION_UP);
+            e.Handled = true;
+        }
+
+        private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            var point = e.GetCurrentPoint(this);
+            // IsInContact: true for both mouse-button-down drags and active touch contacts.
+            if (!point.IsInContact) return;
+            float x = (float)point.Position.X;
+            float y = (float)point.Position.Y;
+            TouchEvent?.Invoke(x, y, MotionEventActions.ACTION_MOVE);
+            e.Handled = true;
+        }
+
+        private void OnPointerCanceled(object sender, PointerRoutedEventArgs e)
+        {
+            var point = e.GetCurrentPoint(this);
+            float x = (float)point.Position.X;
+            float y = (float)point.Position.Y;
+            Debug.WriteLine($"[AndroidRenderSurface] Touch CANCEL at ({x:F1},{y:F1})");
+            TouchEvent?.Invoke(x, y, MotionEventActions.ACTION_CANCEL);
+            e.Handled = true;
         }
 
         /// <summary>
@@ -347,3 +419,4 @@ namespace DalvikUWPCSharp.Reassembly.UI
         }
     }
 }
+

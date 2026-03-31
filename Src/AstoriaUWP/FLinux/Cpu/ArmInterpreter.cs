@@ -114,16 +114,38 @@ namespace DalvikUWPCSharp.FLinux.Cpu
         public async Task RunAsync()
         {
             _running = true;
+            Debug.WriteLine($"[ArmCPU] RunAsync starting – initial PC=0x{PC:X8} SP=0x{SP:X8}");
+            string exitReason = "unknown";
             await Task.Run(() =>
             {
-                while (_running && !_process.Exited)
+                try
                 {
-                    if (!Step()) break;
-                    if (_instructionCount % 100_000 == 0)
-                        Debug.WriteLine($"[ArmCPU] {_instructionCount} instructions, PC=0x{PC:X8}");
+                    while (_running && !_process.Exited)
+                    {
+                        if (!Step())
+                        {
+                            exitReason = $"Step() returned false at PC=0x{PC:X8} after {_instructionCount} instructions";
+                            break;
+                        }
+                        if (_instructionCount % 100_000 == 0)
+                            Debug.WriteLine($"[ArmCPU] {_instructionCount} instructions, PC=0x{PC:X8} CPSR=0x{_cpsr:X8} T={T}");
+                    }
+                    if (_process.Exited && exitReason == "unknown")
+                        exitReason = $"process marked Exited at PC=0x{PC:X8} after {_instructionCount} instructions";
+                    if (!_running && exitReason == "unknown")
+                        exitReason = $"_running cleared externally at PC=0x{PC:X8} after {_instructionCount} instructions";
+                }
+                catch (Exception ex)
+                {
+                    exitReason = $"unhandled exception '{ex.GetType().Name}' at PC=0x{PC:X8}: {ex.Message}";
+                    Debug.WriteLine($"[ArmCPU] Exception in run loop: {ex}");
                 }
             });
-            Debug.WriteLine($"[ArmCPU] Execution finished after {_instructionCount} instructions.");
+            Debug.WriteLine($"[ArmCPU] Execution finished – reason: {exitReason}");
+            Debug.WriteLine($"[ArmCPU] Final state: PC=0x{PC:X8} SP=0x{SP:X8} instructions={_instructionCount}");
+#if DEBUG
+            Debug.WriteLine($"[ArmCPU] Registers: {DumpRegisters()}");
+#endif
         }
 
         public bool Step()

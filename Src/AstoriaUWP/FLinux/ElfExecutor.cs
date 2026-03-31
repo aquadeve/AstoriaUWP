@@ -177,7 +177,7 @@ namespace DalvikUWPCSharp.FLinux
         public Task RunAsync()
         {
             if (_cpu == null) throw new InvalidOperationException("Call Load() first.");
-            Debug.WriteLine($"[ElfExecutor] Starting CPU at PC=0x{_cpu.PC:X}");
+            Debug.WriteLine($"[ElfExecutor] Starting CPU at PC=0x{_cpu.PC:X} SP=0x{_cpu.SP:X} mode={Mode}");
             return _cpu.RunAsync();
         }
 
@@ -188,8 +188,16 @@ namespace DalvikUWPCSharp.FLinux
                                                 string[] argv = null,
                                                 string[] envp = null)
         {
-            if (!Load(elfData, argv, envp)) return false;
+            Debug.WriteLine($"[ElfExecutor] LoadAndRunAsync – ELF size={elfData?.Length ?? 0} bytes");
+            if (!Load(elfData, argv, envp))
+            {
+                Debug.WriteLine("[ElfExecutor] LoadAndRunAsync – Load() failed, aborting.");
+                return false;
+            }
+            Debug.WriteLine("[ElfExecutor] LoadAndRunAsync – Load() succeeded, starting CPU.");
             await RunAsync();
+            Debug.WriteLine("[ElfExecutor] LoadAndRunAsync – CPU loop returned.");
+            Debug.WriteLine($"[ElfExecutor] LoadAndRunAsync – final register dump:\n{DumpRegisters()}");
             return true;
         }
 
