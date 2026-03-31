@@ -38,40 +38,42 @@ namespace DalvikUWPCSharp.Reassembly.UI
 
         public async Task<UIElement> RenderXmlFile(StorageFile sf)
         {
-            string decoded;
-
-            /*
-            //using (MemoryStream stream = new MemoryStream(await Disassembly.Util.ReadFile(sf)))
-
-            byte[] byteArray = await DalvikUWPCSharp.Disassembly.Util.ReadFile(sf);
-            Stream stream1 = new MemoryStream(byteArray, true);
-
-            //ZipArchive zzz = new ZipArchive(stream1);
-
-            //AndroidXmlReader testreader1 = new AndroidXmlReader(stream1);
-
-            //this.zf = new ZipArchive(stream);
-
-
-            var testdocument1 = XDocument.Load(stream1);
-            */
-
-            MemoryStream teststream = new MemoryStream(await Disassembly.Util.ReadFile(sf));
-
-            //AndroidXmlReader testreader = new AndroidXmlReader(teststream);
-
-            //testreader.MoveToContent();
-
+            byte[] fileBytes = await Disassembly.Util.ReadFile(sf);
             XDocument testdocument = null;
 
+            // First attempt: plain-text XML (for files already decoded by DroidApp.Install())
             try
             {
-                testdocument = XDocument.Load(teststream);//(testreader);
-                decoded = testdocument.ToString();
+                using (MemoryStream stream = new MemoryStream(fileBytes))
+                    testdocument = XDocument.Load(stream);
             }
-            catch 
+            catch
             {
-                Debug.WriteLine("Houston, we have some problems!");
+                Debug.WriteLine("[Renderer] Plain-text XML load failed for " + sf.Name + ", trying AndroidXmlReader...");
+            }
+
+            // Second attempt: binary Android XML (AXML) – for apps not yet decoded by Install()
+            if (testdocument == null)
+            {
+                try
+                {
+                    using (MemoryStream stream = new MemoryStream(fileBytes))
+                    using (AndroidXmlReader reader = new AndroidXmlReader(stream))
+                    {
+                        reader.MoveToContent();
+                        testdocument = XDocument.Load(reader);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[Renderer] AndroidXmlReader also failed for " + sf.Name + ": " + ex.Message);
+                }
+            }
+
+            if (testdocument == null)
+            {
+                Debug.WriteLine("! CRITICAL ERROR: Invalid XML File " + sf.DisplayName + " !");
+                return null;
             }
 
             try
@@ -82,65 +84,10 @@ namespace DalvikUWPCSharp.Reassembly.UI
                     return await RenderObject(xe);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-
-                Debug.WriteLine("! CRITICAL ERROR: Invalid XML File " + sf.DisplayName + " !");
-
+                Debug.WriteLine("! CRITICAL ERROR: Invalid XML File " + sf.DisplayName + " ! Exception: " + ex.GetType().Name + ": " + ex.Message);
             }
-
-            /*
-            //(stream)
-            using (MemoryStream stream = new MemoryStream(await Disassembly.Util.ReadFile(sf)))
-            {
-                AndroidXmlReader reader = new AndroidXmlReader(stream);
-
-                //RnD
-                //reader.MoveToContent();
-
-                XDocument document = null;
-                try
-                {
-                    if (reader.ReadState == System.Xml.ReadState.Interactive)
-                    {
-                        document = XDocument.Load(reader);
-                    }
-                    else
-                    {
-                        //document = XDocument.Parse(reader); //  case where there is no content returned
-                    }
-
-                    decoded = document.ToString();
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine("Renderer - RenderXmlFile Exception: " + ex.Message);
-                }
-
-                //string p1nspace = "{http://schemas.android.com/apk/res/android}";
-
-                try
-                {
-                    foreach (XElement xe in document.Elements())
-                    {
-                        //Should only be 1 element
-                        return await RenderObject(xe);
-                    }
-                }
-                catch
-                {
-
-                    Debug.WriteLine("! CRITICAL ERROR: Invalid XML File " + sf.DisplayName + " !");
-                    
-                }
-                //decoded = document.ToString();
-
-                
-            }//using (MemoryStream...
-            */
-
-            //RnD (TODO)
-            //return decoded as UIElement;
 
             return null;
 
@@ -155,14 +102,16 @@ namespace DalvikUWPCSharp.Reassembly.UI
         private void ApplyCommonAttributes(FrameworkElement element, XElement xe)
         {
             // layout_width
+            // Android binary XML encodes match_parent as -1 and wrap_content as -2.
+            // After decoding these appear as the literal strings "-1" and "-2".
             if (xe.Attribute(p1nspace + "layout_width") != null)
             {
                 string val = xe.Attribute(p1nspace + "layout_width").Value;
-                if (val == "match_parent" || val == "fill_parent")
+                if (val == "match_parent" || val == "fill_parent" || val == "-1")
                     element.HorizontalAlignment = HorizontalAlignment.Stretch;
-                else if (val == "wrap_content")
+                else if (val == "wrap_content" || val == "-2")
                     element.Width = double.NaN;
-                else if (double.TryParse(val, out var w))
+                else if (double.TryParse(val, out var w) && w >= 0)
                     element.Width = w;
             }
 
@@ -170,11 +119,11 @@ namespace DalvikUWPCSharp.Reassembly.UI
             if (xe.Attribute(p1nspace + "layout_height") != null)
             {
                 string val = xe.Attribute(p1nspace + "layout_height").Value;
-                if (val == "match_parent" || val == "fill_parent")
+                if (val == "match_parent" || val == "fill_parent" || val == "-1")
                     element.VerticalAlignment = VerticalAlignment.Stretch;
-                else if (val == "wrap_content")
+                else if (val == "wrap_content" || val == "-2")
                     element.Height = double.NaN;
-                else if (double.TryParse(val, out var h))
+                else if (double.TryParse(val, out var h) && h >= 0)
                     element.Height = h;
             }
 
@@ -192,10 +141,12 @@ namespace DalvikUWPCSharp.Reassembly.UI
             }
 
             // visibility
+            // Plain-text layout files use "visible"/"invisible"/"gone".
+            // Binary-decoded XML (via AndroidXmlReader) uses "0"/"1"/"2" instead.
             if (xe.Attribute(p1nspace + "visibility") != null)
             {
                 string vis = xe.Attribute(p1nspace + "visibility").Value.ToLower();
-                element.Visibility = (vis == "gone" || vis == "invisible")
+                element.Visibility = (vis == "gone" || vis == "invisible" || vis == "1" || vis == "2")
                     ? Visibility.Collapsed : Visibility.Visible;
             }
 
@@ -206,10 +157,10 @@ namespace DalvikUWPCSharp.Reassembly.UI
 
             // minWidth / minHeight
             if (xe.Attribute(p1nspace + "minWidth") != null
-                && double.TryParse(xe.Attribute(p1nspace + "minWidth").Value, out var minW))
+                && double.TryParse(xe.Attribute(p1nspace + "minWidth").Value, out var minW) && minW >= 0)
                 element.MinWidth = minW;
             if (xe.Attribute(p1nspace + "minHeight") != null
-                && double.TryParse(xe.Attribute(p1nspace + "minHeight").Value, out var minH))
+                && double.TryParse(xe.Attribute(p1nspace + "minHeight").Value, out var minH) && minH >= 0)
                 element.MinHeight = minH;
 
             // padding (only applies to Control)
@@ -386,7 +337,9 @@ namespace DalvikUWPCSharp.Reassembly.UI
             {
                 StackPanel panel = new StackPanel();
                 string orientation = xe.Attribute(p1nspace + "orientation")?.Value?.ToLower() ?? "vertical";
-                panel.Orientation = orientation == "horizontal" ? Orientation.Horizontal : Orientation.Vertical;
+                // Binary XML encodes orientation as 0=horizontal, 1=vertical
+                panel.Orientation = (orientation == "horizontal" || orientation == "0")
+                    ? Orientation.Horizontal : Orientation.Vertical;
                 ApplyCommonAttributes(panel, xe);
                 if (nestedObjs)
                     foreach (XElement xe1 in xe.Elements())
@@ -662,7 +615,9 @@ namespace DalvikUWPCSharp.Reassembly.UI
             {
                 StackPanel panel = new StackPanel();
                 string orientation = xe.Attribute(p1nspace + "orientation")?.Value?.ToLower() ?? "vertical";
-                panel.Orientation = orientation == "horizontal" ? Orientation.Horizontal : Orientation.Vertical;
+                // Binary XML encodes orientation as 0=horizontal, 1=vertical
+                panel.Orientation = (orientation == "horizontal" || orientation == "0")
+                    ? Orientation.Horizontal : Orientation.Vertical;
                 ApplyCommonAttributes(panel, xe);
                 if (nestedObjs)
                     foreach (XElement xe1 in xe.Elements())
