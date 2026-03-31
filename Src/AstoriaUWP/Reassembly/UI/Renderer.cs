@@ -1294,7 +1294,7 @@ namespace DalvikUWPCSharp.Reassembly.UI
             {
                 StackPanel zc = new StackPanel();
                 zc.Orientation = Orientation.Horizontal;
-                zc.Children.Add(new Button { Content = "−" });
+                zc.Children.Add(new Button { Content = "-" });
                 zc.Children.Add(new Button { Content = "+" });
                 ApplyCommonAttributes(zc, xe);
                 return zc;
@@ -1403,15 +1403,25 @@ namespace DalvikUWPCSharp.Reassembly.UI
                   || xeName == "com.google.android.material.slider.RangeSlider")
             {
                 Slider mSlider = new Slider();
-                if (xe.Attribute(p1nspace + "valueFrom") != null
-                    && double.TryParse(xe.Attribute(p1nspace + "valueFrom").Value, out var vf))
+                string appNs = "{http://schemas.android.com/apk/res-auto}";
+                if (xe.Attribute(appNs + "valueFrom") != null
+                    && double.TryParse(xe.Attribute(appNs + "valueFrom").Value, out var vf))
                     mSlider.Minimum = vf;
-                if (xe.Attribute(p1nspace + "valueTo") != null
-                    && double.TryParse(xe.Attribute(p1nspace + "valueTo").Value, out var vt))
+                else if (xe.Attribute(p1nspace + "valueFrom") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "valueFrom").Value, out var vf2))
+                    mSlider.Minimum = vf2;
+                if (xe.Attribute(appNs + "valueTo") != null
+                    && double.TryParse(xe.Attribute(appNs + "valueTo").Value, out var vt))
                     mSlider.Maximum = vt;
-                if (xe.Attribute(p1nspace + "value") != null
-                    && double.TryParse(xe.Attribute(p1nspace + "value").Value, out var sv))
+                else if (xe.Attribute(p1nspace + "valueTo") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "valueTo").Value, out var vt2))
+                    mSlider.Maximum = vt2;
+                if (xe.Attribute(appNs + "value") != null
+                    && double.TryParse(xe.Attribute(appNs + "value").Value, out var sv))
                     mSlider.Value = sv;
+                else if (xe.Attribute(p1nspace + "value") != null
+                    && double.TryParse(xe.Attribute(p1nspace + "value").Value, out var sv2))
+                    mSlider.Value = sv2;
                 ApplyCommonAttributes(mSlider, xe);
                 return mSlider;
             }
