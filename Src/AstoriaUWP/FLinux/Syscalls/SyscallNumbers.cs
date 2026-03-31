@@ -99,6 +99,34 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
         public const int sendmsg         = 296;
         public const int recvmsg         = 297;
         public const int shutdown        = 293;
+
+        // Additional syscalls from ExAndroidNativeEmu (ARM32 EABI numbers)
+        public const int ptrace          =  26;
+        public const int wait4           = 114;
+        public const int sigaction       =  67;
+        public const int sigaltstack     = 186;
+        public const int vfork           = 190;
+        public const int getuid32        = 199;
+        public const int clone           = 120;
+        public const int getcpu          = 345;
+        public const int dup3_arm32      = 358;
+        public const int process_vm_readv = 376;
+        public const int getrandom       = 384;
+        // VFS syscalls from ExAndroidNativeEmu vfs/file_system.py
+        // Note: unlink(10), ioctl(54), getdents64(217) already defined above.
+        public const int writev          = 146;
+        public const int poll            = 168;
+        public const int llseek          = 140;
+        public const int fcntl64         = 221;
+        public const int statfs64        = 266;
+        public const int mkdirat         = 323;
+        public const int fstatat64       = 327;
+        public const int unlinkat        = 328;
+        public const int readlinkat      = 332;
+        public const int ppoll           = 336;
+        // ARM-private syscalls (encoded as SWI 0xF0000 + N on ARM)
+        public const int ARM_cacheflush  = 0xF0002;
+        public const int ARM_set_tls     = 0xF0005;
     }
 
     /// <summary>
@@ -171,6 +199,22 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
         public const int rt_sigprocmask   = 135;
         public const int sysinfo          = 179;
         public const int gettimeofday     = 169;
+
+        // Additional syscalls from ExAndroidNativeEmu (ARM64 numbers)
+        public const int ptrace           = 117;
+        public const int execve           = 221;
+        public const int clone            = 220;
+        public const int wait4            = 260;
+        public const int sigaltstack      = 132;
+        public const int process_vm_readv = 270;
+        public const int getrandom        = 278;
+        public const int getcpu           = 168;
+        // VFS syscalls from ExAndroidNativeEmu vfs/file_system.py (ARM64)
+        // Note: ioctl(29), getdents64(61), mkdirat(34), unlinkat(35), faccessat(48) already defined above.
+        public const int writev           =  66;
+        public const int statfs           =  43;
+        public const int readlinkat       =  78;
+        public const int ppoll            =  73;
     }
 
     /// <summary>
@@ -286,5 +330,14 @@ namespace DalvikUWPCSharp.FLinux.Syscalls
         public const int prlimit64       = 302;
         public const int getdents64      = 217;
         public const int exit_           =  60;
+
+        // Additional syscalls from ExAndroidNativeEmu (x64 numbers)
+        public const int ptrace          = 101;
+        public const int getrandom       = 318;
+        public const int process_vm_readv = 310;
+        public const int getcpu          = 309;
+        public const int sigaltstack     = 131;
+        public const int tgkill          = 234;
+        public const int tkill           = 200;
     }
 }

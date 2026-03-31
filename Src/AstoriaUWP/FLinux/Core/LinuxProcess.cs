@@ -70,6 +70,9 @@ namespace DalvikUWPCSharp.FLinux.Core
         public bool Exited     { get; private set; }
         public int  ExitStatus { get; private set; }
 
+        // ── Thread-local storage base (from ARM_set_tls / clone CLONE_SETTLS) ──
+        public ulong TlsBase   { get; set; }
+
         // ── Constructor ───────────────────────────────────────────────────────
 
         public LinuxProcess()
