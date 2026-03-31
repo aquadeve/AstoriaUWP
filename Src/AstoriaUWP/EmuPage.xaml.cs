@@ -507,7 +507,7 @@ namespace DalvikUWPCSharp
 
             try
             {
-                appView.Title = RunningApp.metadata.label;
+                appView.Title = RunningApp?.metadata?.label ?? string.Empty;
             }
             catch (Exception ex1)
             {

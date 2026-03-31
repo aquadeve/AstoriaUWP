@@ -178,11 +178,11 @@ namespace DalvikUWPCSharp.Disassembly.APKReader
 
                 try
                 {
-                    if (info.label.StartsWith("@"))
+                    if (info.label != null && info.label.StartsWith("@"))
                     {
                         VER_ICN[LABEL_ID] = info.label;
                     }
-                    else if (int.TryParse(info.label, out labelID))
+                    else if (info.label != null && int.TryParse(info.label, out labelID))
                     {
                         VER_ICN[LABEL_ID] = String.Format("@{0}", labelID.ToString("X4"));
                     }

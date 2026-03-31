@@ -152,6 +152,20 @@ namespace DalvikUWPCSharp
                     return;
                 }
 
+                if (da.metadata == null)
+                {
+                    Debug.WriteLine("[MainPage] App metadata is null – app was not installed correctly.");
+                    ContentDialog metaDialog = new ContentDialog()
+                    {
+                        Title = "Cannot launch application",
+                        Content = "App metadata could not be loaded. The app may not be installed correctly. Try reinstalling.",
+                        PrimaryButtonText = "OK"
+                    };
+                    await metaDialog.ShowAsync();
+                    Frame.Navigate(typeof(MainPage));
+                    return;
+                }
+
                 da.Run(Frame);
             }
             else
